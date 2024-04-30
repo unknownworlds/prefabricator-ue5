@@ -14,3 +14,11 @@ Changes:
 - Fixed some uninitialized struct members that fail UE tests
 - Fix some missing includes
 
+Known Issues:
+- Prefabs will be created inside your currently open folder in the content browser, that's not ideal
+- Crash from prefabs created inside of level instance map editor
+- Crash if you nest a prefab inside itself
+- Meshes with custom primitive data don’t refresh properly in prefabs, the data is there but not visible in the mesh visuals/materials until you edit it
+- Instanced static meshes cannot be used in prefabs
+- Foliage through the foliage tool cannot be used inside of prefabs (but can be placed on prefabs that are placed in the level)
+- Niagara systems in prefabs can cause crashes
