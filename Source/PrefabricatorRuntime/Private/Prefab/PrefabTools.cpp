@@ -10,15 +10,11 @@
 #include "Utils/PrefabricatorService.h"
 #include "Utils/PrefabricatorStats.h"
 
-#include "Engine/Selection.h"
-#include "EngineUtils.h"
+#include "Components/PrimitiveComponent.h"
 #include "GameFramework/Actor.h"
 #include "HAL/UnrealMemory.h"
 #include "PropertyPathHelpers.h"
-#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
-#include "Serialization/ObjectReader.h"
-#include "Serialization/ObjectWriter.h"
-#include "UObject/NoExportTypes.h"
+#include "Engine/World.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogPrefabTools, Log, All);
 
@@ -168,7 +164,26 @@ APrefabActor* FPrefabTools::CreatePrefabFromActors(const TArray<AActor*>& InActo
 
 	UWorld* World = Actors[0]->GetWorld();
 
-	FVector Pivot = FPrefabricatorAssetUtils::FindPivot(Actors);
+	AActor* PivotActor = nullptr;
+	for (AActor* Actor : Actors)
+	{
+		if(Actor && Actor->GetActorNameOrLabel().Contains("PivotActor"))
+		{
+			PivotActor = Actor;
+		}
+	}
+	
+	FVector Pivot;
+	if(PivotActor)
+	{
+		Pivot = PivotActor->GetActorLocation();
+		Actors.Remove(PivotActor);
+		PivotActor->Destroy();
+	}
+	else
+	{
+		Pivot = FPrefabricatorAssetUtils::FindPivot(Actors);
+	}
 	APrefabActor* PrefabActor = World->SpawnActor<APrefabActor>(Pivot, FRotator::ZeroRotator);
 
 	// Find the compatible mobility for the prefab actor
@@ -360,7 +375,8 @@ namespace {
 		for (UPrefabricatorProperty* PrefabProperty : InProperties) {
 			if (!PrefabProperty || PrefabProperty->bIsCrossReferencedActor) continue;
 			FString PropertyName = PrefabProperty->PropertyName;
-			if (PropertyName == "AssetUserData") continue;		// Skip this as assignment is very slow and is not needed
+			if (PropertyName == "AssetUserData") continue;// Skip this as assignment is very slow and is not needed
+			if (PropertyName == "ActorGuid" || PropertyName == "FolderGuid") continue;
 
 			FProperty* Property = InObjToDeserialize->GetClass()->FindPropertyByName(*PropertyName);
 			if (Property) {
@@ -839,7 +855,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				}
 
 				ChildActor = Service->SpawnActor(ActorClass, WorldTransform, PrefabActor->GetLevel(), Template);
-
+				
 				ParentActors(PrefabActor, ChildActor);
 
 				if (Template == nullptr || bPrefabOutOfDate) {
@@ -851,6 +867,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 						LoadState->RegisterTemplate(ActorItemData.PrefabItemID, PrefabAsset->LastUpdateID, ChildActor);
 					}
 				}
+				
 			}
 			else {
 				// This actor was reused.  re-parent it

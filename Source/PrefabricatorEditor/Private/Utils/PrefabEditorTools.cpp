@@ -5,10 +5,12 @@
 #include "Asset/PrefabricatorAsset.h"
 #include "Asset/Thumbnail/PrefabricatorAssetThumbnailScene.h"
 #include "Prefab/PrefabActor.h"
-#include "Prefab/PrefabActor.h"
 #include "Prefab/PrefabComponent.h"
 #include "PrefabricatorSettings.h"
 
+#include "SceneView.h"
+#include "TextureResource.h"
+#include "Engine/Texture2D.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
@@ -269,7 +271,8 @@ UThumbnailInfo* FPrefabEditorTools::CreateDefaultThumbInfo(UPrefabricatorAsset* 
 
 UPrefabricatorAsset* FPrefabEditorTools::CreatePrefabAsset()
 {
-	UPrefabricatorAsset* PrefabAsset = CreateAssetOnContentBrowser<UPrefabricatorAsset>("Prefab", true);
+	UPrefabricatorAsset* PrefabAsset = CreateAssetOnContentBrowser<UPrefabricatorAsset>("PA_Prefab", true);
+
 	if (PrefabAsset) {
 		PrefabAsset->ThumbnailInfo = FPrefabEditorTools::CreateDefaultThumbInfo(PrefabAsset);
 	}
@@ -278,6 +281,6 @@ UPrefabricatorAsset* FPrefabEditorTools::CreatePrefabAsset()
 
 UPrefabricatorAssetCollection* FPrefabEditorTools::CreatePrefabCollectionAsset()
 {
-	return CreateAssetOnContentBrowser<UPrefabricatorAssetCollection>("PrefabCollection", true);
+	return CreateAssetOnContentBrowser<UPrefabricatorAssetCollection>("PAC_PrefabCollection", true);
 }
 
