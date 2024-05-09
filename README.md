@@ -13,6 +13,7 @@ Changes:
 - Added option to create a prefab with a specific pivot by creating it with an actor named "PivotActor"
 - Fixed some uninitialized struct members that fail UE tests
 - Fix some missing includes
+- Fix issues with editor delegates (mostly in niagara systems) getting serialized in prefabs
 
 Known Issues:
 - Prefabs will be created inside your currently open folder in the content browser, that's not ideal
@@ -21,4 +22,4 @@ Known Issues:
 - Meshes with custom primitive data don’t refresh properly in prefabs, the data is there but not visible in the mesh visuals/materials until you edit it
 - Instanced static meshes cannot be used in prefabs
 - Foliage through the foliage tool cannot be used inside of prefabs (but can be placed on prefabs that are placed in the level)
-- Niagara systems in prefabs can cause crashes
+

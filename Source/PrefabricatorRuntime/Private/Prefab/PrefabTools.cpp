@@ -388,6 +388,16 @@ namespace {
 					}
 				}
 
+				//Some editor systems such as niagara setup delegates in editor, these can cause ambiguous
+				//name errors when we try and deserialize them. I don't see a valid situation where a
+				//delegate is saved within a prefab and expected to remain valid. 
+				FDelegateProperty* DelegateProperty = CastField<FDelegateProperty>(Property);
+				FMulticastDelegateProperty* MultiDelegateProperty = CastField<FMulticastDelegateProperty>(Property);
+				if(DelegateProperty || MultiDelegateProperty)
+				{
+					continue;
+				}
+
 				{
 					SCOPE_CYCLE_COUNTER(STAT_DeserializeFields_Iterate_LoadValue);
 					PrefabProperty->LoadReferencedAssetValues();
