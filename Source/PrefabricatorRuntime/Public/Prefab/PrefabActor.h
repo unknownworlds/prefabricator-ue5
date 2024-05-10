@@ -28,6 +28,11 @@ public:
 #endif // WITH_EDITOR
 	/// End of AActor Interface 
 
+	UFUNCTION()
+	void TryLoadPrefab();
+
+	FTimerHandle LoadPrefabTimer;
+	
 	UFUNCTION(BlueprintCallable, Category = "Prefabricator")
 	void LoadPrefab();
 

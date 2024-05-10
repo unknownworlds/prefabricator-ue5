@@ -14,6 +14,8 @@ Changes:
 - Fixed some uninitialized struct members that fail UE tests
 - Fix some missing includes
 - Fix issues with editor delegates (mostly in niagara systems) getting serialized in prefabs
+- Fix prefabs not saving when you create the asset which can cause unable to load asset errors on the child actors placed in maps + source control
+- Fix prefabs loading during map loading where we're not allowed to mark packages as dirty (led to unloaded ghost actors in world partition)
 
 Known Issues:
 - Prefabs will be created inside your currently open folder in the content browser, that's not ideal
@@ -22,4 +24,6 @@ Known Issues:
 - Meshes with custom primitive data don’t refresh properly in prefabs, the data is there but not visible in the mesh visuals/materials until you edit it
 - Instanced static meshes cannot be used in prefabs
 - Foliage through the foliage tool cannot be used inside of prefabs (but can be placed on prefabs that are placed in the level)
+- Names of actors within prefabs don’t update unless you hit save on one of them then every one in the world updates
+- Updating one actor in a prefab will cause a recreate on all actors in that prefab
 

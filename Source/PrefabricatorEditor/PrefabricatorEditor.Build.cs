@@ -39,7 +39,9 @@ namespace UnrealBuildTool.Rules
                     "PlacementMode",
                     "EditorWidgets",
                     "RHI",
-                    "ToolMenus"
+                    "ToolMenus",             
+                    "PrefabricatorRuntime"
+
                 }
 				);
 
@@ -57,7 +59,6 @@ namespace UnrealBuildTool.Rules
 				    "ContentBrowser",
 				    "ContentBrowserData",
                     "Projects",
-                    "PrefabricatorRuntime",
 					// ... add private dependencies that you statically link with here ...
 				}
 				);

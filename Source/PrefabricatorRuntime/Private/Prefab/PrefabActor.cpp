@@ -7,6 +7,7 @@
 #include "Prefab/PrefabComponent.h"
 #include "Prefab/PrefabTools.h"
 #include "Utils/PrefabricatorStats.h"
+#include "TimerManager.h"
 
 #include "UObject/Package.h"
 
@@ -100,7 +101,32 @@ FName APrefabActor::GetCustomIconName() const
 	return PrefabIconName;
 }
 
+
 #endif // WITH_EDITOR
+
+void APrefabActor::TryLoadPrefab()
+{
+#if WITH_EDITOR
+	//If we're loading in editor we can't mark packages dirty so new and destroyed
+	//actors won't get marked dirty correctly and will be missing from source control
+	if(IsInAsyncLoadingThread() || GIsEditorLoadingPackage)
+	{
+		if(!LoadPrefabTimer.IsValid())
+		{
+			GetWorldTimerManager().SetTimer(LoadPrefabTimer, this, &APrefabActor::TryLoadPrefab, 0.1f, true);
+		}
+	}
+	else
+#endif
+	{
+		if(LoadPrefabTimer.IsValid())
+		{
+			GetWorldTimerManager().ClearTimer(LoadPrefabTimer);
+		}
+		LoadPrefab();
+	}
+	
+}
 
 void APrefabActor::LoadPrefab()
 {
