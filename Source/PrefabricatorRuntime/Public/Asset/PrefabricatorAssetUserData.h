@@ -15,5 +15,8 @@ public:
 
 	UPROPERTY(VisibleAnywhere, Category = "Prefabricator")
 	FGuid ItemID;
+
+	UPROPERTY(VisibleAnywhere, Category = "Prefabricator")
+	FGuid ActorLastUpdateID;
 };
 

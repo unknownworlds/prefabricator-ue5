@@ -16,6 +16,8 @@ Changes:
 - Fix issues with editor delegates (mostly in niagara systems) getting serialized in prefabs
 - Fix prefabs not saving when you create the asset which can cause unable to load asset errors on the child actors placed in maps + source control
 - Fix prefabs loading during map loading where we're not allowed to mark packages as dirty (led to unloaded ghost actors in world partition)
+- Improve prefab update handling to better work with One File Per Actor. Prefabs will now only update Actors which need updating and won't touch those that don't need updating. Also they will no longer delete and recreate actors unless needed. 
+- Fix crash when changing physics options on a prefab actor in editor
 
 Known Issues:
 - Prefabs will be created inside your currently open folder in the content browser, that's not ideal
@@ -25,5 +27,5 @@ Known Issues:
 - Instanced static meshes cannot be used in prefabs
 - Foliage through the foliage tool cannot be used inside of prefabs (but can be placed on prefabs that are placed in the level)
 - Names of actors within prefabs don’t update unless you hit save on one of them then every one in the world updates
-- Updating one actor in a prefab will cause a recreate on all actors in that prefab
+
 

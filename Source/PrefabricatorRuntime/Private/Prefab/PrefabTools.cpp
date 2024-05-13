@@ -240,8 +240,9 @@ void FPrefabTools::SaveStateToPrefabAsset(APrefabActor* PrefabActor)
 
 	PrefabAsset->PrefabMobility = PrefabActor->GetRootComponent()->Mobility;
 
+	TArray<FPrefabricatorActorData> OldDataCopy = PrefabAsset->ActorData;
 	PrefabAsset->ActorData.Reset();
-
+	
 	TArray<AActor*> Children;
 	GetActorChildren(PrefabActor, Children);
 
@@ -265,38 +266,71 @@ void FPrefabTools::SaveStateToPrefabAsset(APrefabActor* PrefabActor)
 	struct FSaveContext {
 		AActor* ChildActor;
 		int32 ItemIndex;
+		FPrefabricatorActorData OldData;
 	};
 
 	FPrefabActorLookup ActorCrossReferences;
 	TArray<FSaveContext> ItemsToSave;
-	for (AActor* ChildActor : Children) {
-		if (ChildActor && ChildActor->GetRootComponent()) {
+	for (AActor* ChildActor : Children)
+	{
+		if (ChildActor && ChildActor->GetRootComponent())
+		{
 			UPrefabricatorAssetUserData* ChildUserData = ChildActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
 			FGuid ItemID;
-			if (ChildUserData && ChildUserData->PrefabActor == PrefabActor) {
+			if (ChildUserData && ChildUserData->PrefabActor == PrefabActor)
+			{
 				ItemID = ChildUserData->ItemID;
 			}
-			else {
+			else
+			{
 				ItemID = FGuid::NewGuid();
 			}
 			AssignAssetUserData(ChildActor, ItemID, PrefabActor);
+			
 			int32 NewItemIndex = PrefabAsset->ActorData.AddDefaulted();
-			FPrefabricatorActorData& ActorData = PrefabAsset->ActorData[NewItemIndex];
-			ActorData.PrefabItemID = ItemID;
-			ActorCrossReferences.Register(ChildActor, ItemID);
-
+			FPrefabricatorActorData& NewActorData = PrefabAsset->ActorData[NewItemIndex];
+			NewActorData.PrefabItemID = ItemID;//This might be the old ID
+			
 			FSaveContext SaveInfo;
 			SaveInfo.ChildActor = ChildActor;
 			SaveInfo.ItemIndex = NewItemIndex;
+			
+			//Check if we already have data for this child and copy it if we did
+			for(int32 i=0; i<OldDataCopy.Num(); i++)
+			{
+				FPrefabricatorActorData& OldData = OldDataCopy[i];
+				if(OldData.PrefabItemID == ItemID)
+				{
+					FPrefabricatorActorData::StaticStruct()->CopyScriptStruct(&NewActorData, &OldData);
+					FPrefabricatorActorData::StaticStruct()->CopyScriptStruct(&SaveInfo.OldData, &OldData);
+					break;
+				}
+			}
+
+			ActorCrossReferences.Register(ChildActor, ItemID);
+
+			
 			ItemsToSave.Add(SaveInfo);
 		}
 	}
 
-	for (const FSaveContext& SaveInfo : ItemsToSave) {
+	for (const FSaveContext& SaveInfo : ItemsToSave)
+	{
 		AActor* ChildActor = SaveInfo.ChildActor;
-		if (ChildActor && ChildActor->GetRootComponent()) {
+		if (ChildActor && ChildActor->GetRootComponent())
+		{
+			FPrefabricatorActorData OldActorData = SaveInfo.OldData;
 			FPrefabricatorActorData& ActorData = PrefabAsset->ActorData[SaveInfo.ItemIndex];
 			SaveActorState(ChildActor, PrefabActor, ActorCrossReferences, ActorData);
+
+			UPrefabricatorAssetUserData* ChildUserData = ChildActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
+
+			if(!OldActorData.Equals(ActorData))
+			{
+				ActorData.ActorLastUpdateID = FGuid::NewGuid();
+			}
+			
+			ChildUserData->ActorLastUpdateID = ActorData.ActorLastUpdateID;
 		}
 	}
 	PrefabAsset->Version = (uint32)EPrefabricatorAssetVersion::LatestVersion;
@@ -429,6 +463,8 @@ namespace {
 			if (Property->HasAnyPropertyFlags(CPF_Transient)) {
 				continue;
 			}
+			FString PropertyName = Property->GetName();
+			if (PropertyName == "ActorGuid" || PropertyName == "FolderGuid") continue;
 
 			if (FPrefabTools::ShouldIgnorePropertySerialization(Property->GetFName())) {
 				continue;
@@ -579,6 +615,9 @@ void FPrefabTools::SaveActorState(AActor* InActor, APrefabActor* PrefabActor, co
 {
 	if (!InActor) return;
 
+	OutActorData.Components.Empty();
+	OutActorData.Properties.Empty();
+	
 	FTransform InversePrefabTransform = PrefabActor->GetTransform().Inverse();
 	FTransform LocalTransform = InActor->GetTransform() * InversePrefabTransform;
 	OutActorData.RelativeTransform = LocalTransform;
@@ -671,8 +710,13 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 								break;
 							}
 						}
-						if (bRecreatePhysicsState) {
-							Primitive->InitializeComponent();
+						if (bRecreatePhysicsState)
+						{
+
+							if(!Primitive->HasBeenInitialized())
+							{
+								Primitive->InitializeComponent();
+							}
 							Primitive->RecreatePhysicsState();
 						}
 					}
@@ -802,6 +846,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 	TSharedPtr<IPrefabricatorService> Service = FPrefabricatorService::Get();
 
 	TMap<FGuid, AActor*> ActorByItemID;
+	TMap<FGuid, FGuid> LastUpdateByItemID;
 	for (AActor* ExistingActor : ExistingActorPool) {
 		if (ExistingActor && ExistingActor->GetRootComponent()) {
 			UPrefabricatorAssetUserData* PrefabUserData = ExistingActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
@@ -811,6 +856,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				if (ChildActors.Num() == 0) {
 					// Only reuse actors that have no children
 					ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
+					LastUpdateByItemID.Add(PrefabUserData->ItemID, PrefabUserData->ActorLastUpdateID);
 				}
 			}
 		}
@@ -836,25 +882,42 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 			// Try to re-use an existing actor from this prefab
 			AActor* ChildActor = nullptr;
 			bool bPrefabOutOfDate = PrefabActor->LastUpdateID != PrefabAsset->LastUpdateID;
-			if (!bPrefabOutOfDate) {
-				// The prefab is not out of date. try to reuse an existing actor item
-				if (AActor** SearchResult = ActorByItemID.Find(ActorItemData.PrefabItemID)) {
-					ChildActor = *SearchResult;
-					if (ChildActor) {
-						FString ExistingClassName = ChildActor->GetClass()->GetPathName();
-						FString RequiredClassName = ActorItemData.ClassPathRef.GetAssetPathString();
-						if (ExistingClassName == RequiredClassName) {
-							// We can reuse this actor
-							ExistingActorPool.Remove(ChildActor);
-							ActorByItemID.Remove(ActorItemData.PrefabItemID);
-						}
-						else {
-							ChildActor = nullptr;
-						}
+
+			bool ActorIsOutOfDate = true;
+			FGuid* UpdateGUID = LastUpdateByItemID.Find(ActorItemData.PrefabItemID);
+			if(UpdateGUID && ActorItemData.ActorLastUpdateID == *UpdateGUID)
+			{
+				ActorIsOutOfDate = false;
+			}
+			
+			// Always try and reuse Actors if we can
+			if (AActor** SearchResult = ActorByItemID.Find(ActorItemData.PrefabItemID))
+			{
+				ChildActor = *SearchResult;
+				if (ChildActor)
+				{
+					FString ExistingClassName = ChildActor->GetClass()->GetPathName();
+					FString RequiredClassName = ActorItemData.ClassPathRef.GetAssetPathString();
+					if (ExistingClassName == RequiredClassName)
+					{
+						// We can reuse this actor
+						ExistingActorPool.Remove(ChildActor);
+						ActorByItemID.Remove(ActorItemData.PrefabItemID);
+						LastUpdateByItemID.Remove(ActorItemData.PrefabItemID);
+					}
+					else
+					{
+						ChildActor = nullptr;
 					}
 				}
+			
 			}
 
+			//If the actor isn't out of date we don't need to do anything at all
+			if(!ActorIsOutOfDate)
+			{
+				continue;
+			}
 
 			FTransform WorldTransform = ActorItemData.RelativeTransform * PrefabActor->GetTransform();
 			if (!ChildActor) {
@@ -868,7 +931,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				
 				ParentActors(PrefabActor, ChildActor);
 
-				if (Template == nullptr || bPrefabOutOfDate) {
+				if (Template == nullptr || (bPrefabOutOfDate)) {
 					// We couldn't use a template,  so load the prefab properties in
 					LoadActorState(ChildActor, ActorItemData, InSettings);
 
@@ -883,18 +946,35 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				// This actor was reused.  re-parent it
 				ChildActor->DetachFromActor(FDetachmentTransformRules(EDetachmentRule::KeepWorld, true));
 				ParentActors(PrefabActor, ChildActor);
-
+				
 				// Update the world transform.   The reuse happens only on leaf actors (which don't have any further child actors)
-				if (ChildActor->GetRootComponent()) {
+				if (ChildActor->GetRootComponent())
+				{
 					EComponentMobility::Type OldChildMobility = ChildActor->GetRootComponent()->Mobility;
 					ChildActor->GetRootComponent()->SetMobility(EComponentMobility::Movable);
 					ChildActor->SetActorTransform(WorldTransform);
 					ChildActor->GetRootComponent()->SetMobility(OldChildMobility);
 				}
+
+				{
+					//Actor is out of date so we need to update it
+					LoadActorState(ChildActor, ActorItemData, InSettings);
+				}
+				
 			}
 
 			AssignAssetUserData(ChildActor, ActorItemData.PrefabItemID, PrefabActor);
 
+			//We've updated to the target update ID
+			if(ChildActor->GetRootComponent())
+			{
+				UPrefabricatorAssetUserData* PrefabUserData = ChildActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
+				if(PrefabUserData)
+				{
+					PrefabUserData->ActorLastUpdateID = ActorItemData.ActorLastUpdateID;
+				}
+			}
+			
 			{
 				AActor*& ChildActorRef = PrefabItemToActorMap.FindOrAdd(ActorItemData.PrefabItemID);
 				ChildActorRef = ChildActor;
@@ -910,6 +990,8 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 					LoadStateFromPrefabAsset(ChildPrefab, InSettings);
 				}
 			}
+
+
 		}
 
 		// Fix up the cross references
