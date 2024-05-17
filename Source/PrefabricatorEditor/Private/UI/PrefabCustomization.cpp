@@ -103,8 +103,17 @@ void FPrefabActorCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailBui
 			//.Padding(4.0f)
 			[
 				SNew(SButton)
-				.Text(LOCTEXT("PrefabCommand_LoadFromAsset", "Load Prefab from Asset"))
+				.Text(LOCTEXT("PrefabCommand_LoadFromAsset", "Reload Prefab"))
 				.OnClicked(FOnClicked::CreateStatic(&FPrefabActorCustomization::HandleLoadFromAsset, &DetailBuilder))
+			]
+			+SHorizontalBox::Slot()
+			.VAlign(VAlign_Center)
+			.FillWidth(1.0f)
+			//.Padding(4.0f)
+			[
+				SNew(SButton)
+				.Text(LOCTEXT("PrefabCommand_ForceLoadFromAsset", "Force Reload Prefab"))
+				.OnClicked(FOnClicked::CreateStatic(&FPrefabActorCustomization::HandleForceLoadFromAsset, &DetailBuilder))
 			]
 
 		];
@@ -203,6 +212,17 @@ FReply FPrefabActorCustomization::HandleLoadFromAsset(IDetailLayoutBuilder* Deta
 	for (APrefabActor* PrefabActor : PrefabActors) {
 		if (PrefabActor) {
 			PrefabActor->LoadPrefab();
+		}
+	}
+	return FReply::Handled();
+}
+
+FReply FPrefabActorCustomization::HandleForceLoadFromAsset(IDetailLayoutBuilder* DetailBuilder)
+{
+	TArray<APrefabActor*> PrefabActors = GetDetailObject<APrefabActor>(DetailBuilder);
+	for (APrefabActor* PrefabActor : PrefabActors) {
+		if (PrefabActor) {
+			PrefabActor->LoadPrefab(true);
 		}
 	}
 	return FReply::Handled();

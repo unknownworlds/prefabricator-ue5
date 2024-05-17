@@ -16,6 +16,7 @@ public:
 	static FReply HandleSaveToAsset(IDetailLayoutBuilder* DetailBuilder);
 	static FReply HandleSaveToNewAsset(IDetailLayoutBuilder* DetailBuilder);
 	static FReply HandleLoadFromAsset(IDetailLayoutBuilder* DetailBuilder);
+	static FReply HandleForceLoadFromAsset(IDetailLayoutBuilder* DetailBuilder);
 	static FReply RandomizePrefabCollection(IDetailLayoutBuilder* DetailBuilder);
 	static FReply UnlinkPrefab(IDetailLayoutBuilder* DetailBuilder);
 };

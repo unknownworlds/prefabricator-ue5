@@ -62,7 +62,7 @@ public:
 	static void AssignAssetUserData(AActor* InActor, const FGuid& InItemID, APrefabActor* Prefab);
 
 	static void SaveStateToPrefabAsset(APrefabActor* PrefabActor);
-	static void LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings = FPrefabLoadSettings());
+	static void LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings = FPrefabLoadSettings(), bool ForceUpdate = false);
 
 	static void FixupCrossReferences(const TArray<UPrefabricatorProperty*>& PrefabProperties, UObject* ObjToWrite, TMap<FGuid, AActor*>& PrefabItemToActorMap);
 

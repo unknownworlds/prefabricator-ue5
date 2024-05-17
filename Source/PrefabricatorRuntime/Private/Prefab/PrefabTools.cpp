@@ -728,6 +728,12 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 	InActor->PostLoad();
 	InActor->ReregisterAllComponents();
 
+	const UPrefabricatorSettings* Settings = GetDefault<UPrefabricatorSettings>();
+	if(Settings)
+	{
+		InActor->Tags.AddUnique(Settings->PrefabChildTag);
+	}
+	
 #if WITH_EDITOR
 	if (InActorData.ActorName.Len() > 0) {
 		InActor->SetActorLabel(InActorData.ActorName);
@@ -822,7 +828,7 @@ FBox FPrefabTools::GetPrefabBounds(AActor* PrefabActor, bool bNonColliding)
 	return Result;
 }
 
-void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings)
+void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings, bool ForceUpdate/*= false*/)
 {
 	SCOPE_CYCLE_COUNTER(STAT_LoadStateFromPrefabAsset);
 	if (!PrefabActor) {
@@ -887,7 +893,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 			FGuid* UpdateGUID = LastUpdateByItemID.Find(ActorItemData.PrefabItemID);
 			if(UpdateGUID && ActorItemData.ActorLastUpdateID == *UpdateGUID)
 			{
-				ActorIsOutOfDate = false;
+				ActorIsOutOfDate = ForceUpdate;//If we're forcing an update the actor is always out of date
 			}
 			
 			// Always try and reuse Actors if we can
@@ -989,6 +995,12 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				if (InSettings.bSynchronousBuild) {
 					LoadStateFromPrefabAsset(ChildPrefab, InSettings);
 				}
+
+				const UPrefabricatorSettings* Settings = GetDefault<UPrefabricatorSettings>();
+				if(Settings)
+				{
+					ChildPrefab->Tags.AddUnique(Settings->NestedPrefabTag);
+				}
 			}
 
 
@@ -1030,6 +1042,12 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 
 	PrefabActor->LastUpdateID = PrefabAsset->LastUpdateID;
 
+	const UPrefabricatorSettings* Settings = GetDefault<UPrefabricatorSettings>();
+	if(Settings)
+	{
+		PrefabActor->Tags.AddUnique(Settings->PrefabParentTag);
+	}
+	
 	if (InSettings.bSynchronousBuild) {
 		PrefabActor->HandleBuildComplete();
 	}

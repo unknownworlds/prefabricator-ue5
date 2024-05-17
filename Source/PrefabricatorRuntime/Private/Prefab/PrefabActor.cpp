@@ -128,9 +128,9 @@ void APrefabActor::TryLoadPrefab()
 	
 }
 
-void APrefabActor::LoadPrefab()
+void APrefabActor::LoadPrefab(bool ForceUpdate/*=false*/)
 {
-	FPrefabTools::LoadStateFromPrefabAsset(this, FPrefabLoadSettings());
+	FPrefabTools::LoadStateFromPrefabAsset(this, FPrefabLoadSettings(), ForceUpdate);
 }
 
 void APrefabActor::SavePrefab()

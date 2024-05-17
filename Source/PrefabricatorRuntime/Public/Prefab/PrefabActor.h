@@ -34,7 +34,7 @@ public:
 	FTimerHandle LoadPrefabTimer;
 	
 	UFUNCTION(BlueprintCallable, Category = "Prefabricator")
-	void LoadPrefab();
+	void LoadPrefab(bool ForceUpdate=false);
 
 	UFUNCTION(BlueprintCallable, Category = "Prefabricator")
 	void SavePrefab();
