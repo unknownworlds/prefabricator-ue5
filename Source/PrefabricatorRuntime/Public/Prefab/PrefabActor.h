@@ -49,7 +49,9 @@ public:
 	void RandomizeSeed(const FRandomStream& InRandom, bool bRecursive = true);
 	void HandleBuildComplete();
 
-public:
+#if WITH_EDITOR
+	virtual void SetIsTemporarilyHiddenInEditor(bool bIsHidden) override;
+#endif
 	// The last update ID of the prefab asset when this actor was refreshed from it
 	// This is used to test if the prefab has changed since we last recreated it
 	UPROPERTY()

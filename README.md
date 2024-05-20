@@ -20,6 +20,7 @@ Changes:
 - Fix crash when changing physics options on a prefab actor in editor
 - Change prefab reloading logic. Reload prefab (default on loading the level) will not update any local instance changed actors unless they have changed in the prefab. Force reload prefab will force an update on all actors in the prefab and will lose your local changes to the instance. 
 - Add tags to prefabs "Prefab" "NestedPrefab" and "PrefabChildActor" so they can be understood/read by other plugins. E.g for excluding selecting prefab children with mass selection tools. Will add on next update to the prefab. 
+- Fix prefabs not hiding children when you press H to hide selected actors
 
 Known Issues:
 - Prefabs will be created inside your currently open folder in the content browser, that's not ideal

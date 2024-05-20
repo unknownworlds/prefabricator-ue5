@@ -181,6 +181,22 @@ void APrefabActor::HandleBuildComplete()
 	}
 }
 
+#if WITH_EDITOR
+void APrefabActor::SetIsTemporarilyHiddenInEditor(bool bIsHidden)
+{
+	Super::SetIsTemporarilyHiddenInEditor(bIsHidden);
+
+	TArray<AActor*> ChildActors;
+	GetAttachedActors(ChildActors);
+	for(AActor* Child : ChildActors)
+	{
+		if(Child)
+		{
+			Child->SetIsTemporarilyHiddenInEditor(bIsHidden);
+		}
+	}
+}
+#endif
 ////////////////////////////////// FPrefabBuildSystem //////////////////////////////////
 FPrefabBuildSystem::FPrefabBuildSystem(double InTimePerFrame)
 	: TimePerFrame(InTimePerFrame)
