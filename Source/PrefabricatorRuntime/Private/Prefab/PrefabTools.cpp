@@ -700,12 +700,15 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 					}
 				}
 
-				// Check if we need to recreate the physics state
+				// Check if we need to recreate the physics state and refresh custom primitive data
 				{
-					if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component)) {
+					if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+					{
 						bool bRecreatePhysicsState = false;
-						for (UPrefabricatorProperty* Property : ComponentData.Properties) {
-							if (Property->PropertyName == "BodyInstance") {
+						for (UPrefabricatorProperty* Property : ComponentData.Properties)
+						{
+							if (Property->PropertyName == "BodyInstance")
+							{
 								bRecreatePhysicsState = true;
 								break;
 							}
@@ -719,6 +722,10 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 							}
 							Primitive->RecreatePhysicsState();
 						}
+
+						//Post load to force an update of custom primitive data
+						Primitive->PostLoad();
+						Primitive->MarkRenderStateDirty();
 					}
 				}
 			}
@@ -980,11 +987,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 					PrefabUserData->ActorLastUpdateID = ActorItemData.ActorLastUpdateID;
 				}
 			}
-			
-			{
-				AActor*& ChildActorRef = PrefabItemToActorMap.FindOrAdd(ActorItemData.PrefabItemID);
-				ChildActorRef = ChildActor;
-			}
+
 
 			if (APrefabActor* ChildPrefab = Cast<APrefabActor>(ChildActor)) {
 				SCOPE_CYCLE_COUNTER(STAT_LoadStateFromPrefabAsset5);

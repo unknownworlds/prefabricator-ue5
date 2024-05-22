@@ -21,12 +21,12 @@ Changes:
 - Change prefab reloading logic. Reload prefab (default on loading the level) will not update any local instance changed actors unless they have changed in the prefab. Force reload prefab will force an update on all actors in the prefab and will lose your local changes to the instance. 
 - Add tags to prefabs "Prefab" "NestedPrefab" and "PrefabChildActor" so they can be understood/read by other plugins. E.g for excluding selecting prefab children with mass selection tools. Will add on next update to the prefab. 
 - Fix prefabs not hiding children when you press H to hide selected actors
+- Fix custom primitive data not refreshing when you place prefabs
 
 Known Issues:
 - Prefabs will be created inside your currently open folder in the content browser, that's not ideal
 - Crash from prefabs created inside of level instance map editor
 - Crash if you nest a prefab inside itself
-- Meshes with custom primitive data don’t refresh properly in prefabs, the data is there but not visible in the mesh visuals/materials until you edit it
 - Instanced static meshes cannot be used in prefabs
 - Foliage through the foliage tool cannot be used inside of prefabs (but can be placed on prefabs that are placed in the level)
 - Names of actors within prefabs don’t update unless you hit save on one of them then every one in the world updates
