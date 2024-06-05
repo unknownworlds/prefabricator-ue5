@@ -3,6 +3,7 @@
 #include "Utils/ConstructionSystemUtils.h"
 
 #include "Asset/PrefabricatorAsset.h"
+#include "Engine/World.h"
 #include "ConstructionSystem/ConstructionSystemSnap.h"
 #include "ConstructionSystemComponent.h"
 #include "Prefab/PrefabActor.h"
@@ -529,7 +530,6 @@ bool FConstructionSystemCollision::WallBoxCollision(const FVector& InWallExtent,
 		|| WallWallCollision(InWallExtent, InWallTransform, ExtentZX, ZXN)
 		|| WallWallCollision(InWallExtent, InWallTransform, ExtentZX, ZXP);
 
-	return false;
 }
 
 bool FConstructionSystemCollision::WallWallCollision(const FVector& ExtentA, const FTransform& TransformA, const FVector& ExtentB, const FTransform& TransformB)

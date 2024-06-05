@@ -19,10 +19,10 @@ struct CONSTRUCTIONSYSTEMRUNTIME_API FConstructionSystemUIPrefabEntry {
 	FText Tooltip;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Prefabricator")
-	UTexture2D* Icon;
+	UTexture2D* Icon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Prefabricator")
-	UPrefabricatorAssetInterface* Prefab;
+	UPrefabricatorAssetInterface* Prefab = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -33,7 +33,7 @@ struct CONSTRUCTIONSYSTEMRUNTIME_API FConstructionSystemUICategory {
 	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Prefabricator")
-	UTexture2D* Icon;
+	UTexture2D* Icon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Prefabricator")
 	TArray<FConstructionSystemUIPrefabEntry> PrefabEntries;

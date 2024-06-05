@@ -8,6 +8,7 @@
 #include "Prefab/PrefabTools.h"
 #include "Utils/PrefabricatorStats.h"
 #include "TimerManager.h"
+#include "Engine/World.h"
 
 #include "UObject/Package.h"
 
@@ -62,6 +63,17 @@ void APrefabActor::PostLoad()
 {
 	Super::PostLoad();
 
+#if WITH_EDITOR
+	
+	//Need to do this on post load to catch prefabs loaded via world partition region loading
+	//Make sure we're not doing this in game though
+	const UWorld* World = GetWorld();
+	if(World && World->WorldType == EWorldType::Editor && IsPrefabOutdated())
+	{
+		TryLoadPrefab();
+	}
+#endif
+	
 }
 
 void APrefabActor::PostActorCreated()

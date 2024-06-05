@@ -865,12 +865,8 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 			UPrefabricatorAssetUserData* PrefabUserData = ExistingActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
 			if (PrefabUserData && PrefabUserData->PrefabActor == PrefabActor) {
 				TArray<AActor*> ChildActors;
-				ExistingActor->GetAttachedActors(ChildActors);
-				if (ChildActors.Num() == 0) {
-					// Only reuse actors that have no children
-					ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
-					LastUpdateByItemID.Add(PrefabUserData->ItemID, PrefabUserData->ActorLastUpdateID);
-				}
+				ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
+				LastUpdateByItemID.Add(PrefabUserData->ItemID, PrefabUserData->ActorLastUpdateID);
 			}
 		}
 	}
