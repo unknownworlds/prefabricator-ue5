@@ -2,6 +2,11 @@
 
 #include "Prefab/PrefabTools.h"
 
+#if WITH_EDITOR
+#include "ISourceControlModule.h"
+#include "ISourceControlState.h"
+#include "ISourceControlProvider.h"
+#endif
 #include "Asset/PrefabricatorAsset.h"
 #include "Asset/PrefabricatorAssetUserData.h"
 #include "Prefab/PrefabActor.h"
@@ -411,6 +416,10 @@ namespace {
 			FString PropertyName = PrefabProperty->PropertyName;
 			if (PropertyName == "AssetUserData") continue;// Skip this as assignment is very slow and is not needed
 			if (PropertyName == "ActorGuid" || PropertyName == "FolderGuid") continue;
+
+			//Temporary fix to prevent niagara crashes.
+			//TODO - Need to find a more long term solution as this loses instance overrides
+			if (PropertyName == "InstanceParameterOverrides") continue;
 
 			FProperty* Property = InObjToDeserialize->GetClass()->FindPropertyByName(*PropertyName);
 			if (Property) {
@@ -835,7 +844,7 @@ FBox FPrefabTools::GetPrefabBounds(AActor* PrefabActor, bool bNonColliding)
 	return Result;
 }
 
-void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings, bool ForceUpdate/*= false*/)
+void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings, bool ForceUpdate/*= false*/, bool IgnoreLastUpdate)
 {
 	SCOPE_CYCLE_COUNTER(STAT_LoadStateFromPrefabAsset);
 	if (!PrefabActor) {
@@ -849,6 +858,24 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 		return;
 	}
 
+	bool bPrefabOutOfDate = PrefabActor->LastUpdateID != PrefabAsset->LastUpdateID;
+	if(!bPrefabOutOfDate && !ForceUpdate && !IgnoreLastUpdate)
+	{
+		return;
+	}
+	
+#if WITH_EDITOR
+	ISourceControlModule& SourceControlModule = ISourceControlModule::Get();
+	if (SourceControlModule.IsEnabled() && SourceControlModule.GetProvider().IsAvailable())
+	{
+		TSharedPtr<ISourceControlState, ESPMode::ThreadSafe> State = SourceControlModule.GetProvider().GetState(PrefabActor->GetPackage(), EStateCacheUsage::ForceUpdate);
+		if (State.IsValid() && State->IsCheckedOutOther())
+		{
+			return;//Don't update prefabs checked out by someone else, they'll get updated when the lock is free
+		}
+	}
+#endif
+	
 	PrefabActor->GetRootComponent()->SetMobility(PrefabAsset->PrefabMobility);
 
 	// Pool existing child actors that belong to this prefab
@@ -890,7 +917,6 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 
 			// Try to re-use an existing actor from this prefab
 			AActor* ChildActor = nullptr;
-			bool bPrefabOutOfDate = PrefabActor->LastUpdateID != PrefabAsset->LastUpdateID;
 
 			bool ActorIsOutOfDate = true;
 			FGuid* UpdateGUID = LastUpdateByItemID.Find(ActorItemData.PrefabItemID);
@@ -992,7 +1018,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 					ChildPrefab->Seed = FPrefabTools::GetRandomSeed(*InSettings.Random);
 				}
 				if (InSettings.bSynchronousBuild) {
-					LoadStateFromPrefabAsset(ChildPrefab, InSettings);
+					LoadStateFromPrefabAsset(ChildPrefab, InSettings, false, true);
 				}
 
 				const UPrefabricatorSettings* Settings = GetDefault<UPrefabricatorSettings>();
@@ -1003,6 +1029,9 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 			}
 
 
+#if WITH_EDITOR
+			ChildActor->MarkPackageDirty();
+#endif 
 		}
 
 		// Fix up the cross references
@@ -1035,8 +1064,13 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 	}
 
 	// Destroy the unused actors from the pool
-	for (AActor* UnusedActor : ExistingActorPool) {
+	for (AActor* UnusedActor : ExistingActorPool)
+	{
 		DestroyActorTree(UnusedActor);
+		
+#if WITH_EDITOR
+		UnusedActor->MarkPackageDirty();
+#endif 
 	}
 
 	PrefabActor->LastUpdateID = PrefabAsset->LastUpdateID;
@@ -1050,6 +1084,10 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 	if (InSettings.bSynchronousBuild) {
 		PrefabActor->HandleBuildComplete();
 	}
+
+#if WITH_EDITOR
+	PrefabActor->MarkPackageDirty();
+#endif
 }
 
 void FPrefabTools::FixupCrossReferences(const TArray<UPrefabricatorProperty*>& PrefabProperties, UObject* ObjToWrite, TMap<FGuid, AActor*>& PrefabItemToActorMap)

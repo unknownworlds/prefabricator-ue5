@@ -103,7 +103,7 @@ void APrefabActor::PostDuplicate(EDuplicateMode::Type DuplicateMode)
 		FPrefabLoadSettings LoadSettings;
 		LoadSettings.bRandomizeNestedSeed = true;
 		LoadSettings.Random = &Random;
-		FPrefabTools::LoadStateFromPrefabAsset(this, LoadSettings);
+		FPrefabTools::LoadStateFromPrefabAsset(this, LoadSettings, true);
 	}
 }
 

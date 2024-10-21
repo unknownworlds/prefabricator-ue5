@@ -11,7 +11,7 @@ class UPrefabricatorProperty;
 struct FRandomStream;
 
 struct PREFABRICATORRUNTIME_API FPrefabLoadSettings {
-	bool bUnregisterComponentsBeforeLoading = true;
+	bool bUnregisterComponentsBeforeLoading = false;
 	bool bRandomizeNestedSeed = false;
 	bool bSynchronousBuild = true;
 	bool bCanLoadFromCachedTemplate = false;
@@ -62,7 +62,7 @@ public:
 	static void AssignAssetUserData(AActor* InActor, const FGuid& InItemID, APrefabActor* Prefab);
 
 	static void SaveStateToPrefabAsset(APrefabActor* PrefabActor);
-	static void LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings = FPrefabLoadSettings(), bool ForceUpdate = false);
+	static void LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPrefabLoadSettings& InSettings = FPrefabLoadSettings(), bool ForceUpdate = false, bool IgnoreLastUpdate = false);
 
 	static void FixupCrossReferences(const TArray<UPrefabricatorProperty*>& PrefabProperties, UObject* ObjToWrite, TMap<FGuid, AActor*>& PrefabItemToActorMap);
 
