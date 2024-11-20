@@ -646,6 +646,11 @@ void FPrefabTools::SaveActorState(AActor* InActor, APrefabActor* PrefabActor, co
 	for (UActorComponent* Component : Components) {
 		int32 ComponentDataIdx = OutActorData.Components.AddDefaulted();
 		FPrefabricatorComponentData& ComponentData = OutActorData.Components[ComponentDataIdx];
+		
+		FString ComponentClassPath = Component->GetClass()->GetPathName();
+		ComponentData.ClassPathRef = FSoftClassPath(ComponentClassPath);
+		ComponentData.ClassPath = ComponentClassPath;
+		
 		ComponentData.ComponentName = Component->GetPathName(InActor);
 		if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component)) {
 			ComponentData.RelativeTransform = SceneComponent->GetComponentTransform();
@@ -679,9 +684,76 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 	}
 
 	TMap<FString, UActorComponent*> ComponentsByName;
+	TMap<FString, UActorComponent*> InstanceComponentsByName;
 	for (UActorComponent* Component : InActor->GetComponents()) {
 		FString ComponentPath = Component->GetPathName(InActor);
 		ComponentsByName.Add(ComponentPath, Component);
+		if (Component->CreationMethod == EComponentCreationMethod::Instance)
+		{
+			InstanceComponentsByName.Add(ComponentPath, Component);
+		}
+	}
+	
+	// Ensure the correct instance components exist since they won't have been created by creating the actor.
+	for (const FPrefabricatorComponentData& ComponentData : InActorData.Components)
+	{
+		
+		// Check for CreationMethod: Instance.
+		bool bCreationMethodInstance = false;
+		for (UPrefabricatorProperty* Property : ComponentData.Properties)
+		{
+			if (Property->PropertyName == "CreationMethod")
+			{
+				if (Property->ExportedValue == "Instance")
+				{
+					bCreationMethodInstance = true;
+				}
+			}
+		}
+
+		if (bCreationMethodInstance)
+		{
+			
+			// If it's not already there, it will need created and added to the list of components on the actor.
+			if (UActorComponent** SearchResult = ComponentsByName.Find(ComponentData.ComponentName); !SearchResult)
+			{
+				
+				// Older prefab data lacked ClassPath/ClassPathRef but still possibly contained instance components that weren't actually being used.  Ignore them and warn.
+				if (ComponentData.ClassPathRef.IsNull())
+				{
+					UE_LOG(LogPrefabTools, Warning, TEXT("Can't create prefab instance component %s on actor %s due to the prefab being an older version, try resaving the prefab"), *ComponentData.ComponentName, *InActor->GetName());
+					continue;
+				}
+				
+				UClass* ComponentClass = LoadObject<UClass>(nullptr, *ComponentData.ClassPathRef.GetAssetPathString());
+				if (!ComponentClass || !ComponentClass->IsChildOf(USceneComponent::StaticClass()))
+				{
+					UE_LOG(LogPrefabTools, Error, TEXT("Failed to load class for component %s"), *ComponentData.ClassPathRef.GetAssetPathString());
+					continue;
+				}
+				
+				USceneComponent* NewComponent = NewObject<USceneComponent>(InActor, ComponentClass, FName(ComponentData.ComponentName));
+				NewComponent->CreationMethod = EComponentCreationMethod::Instance;
+				NewComponent->AttachToComponent(InActor->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+				NewComponent->RegisterComponent();
+				InActor->AddInstanceComponent(NewComponent);
+				
+				FString ComponentPath = NewComponent->GetPathName(InActor);
+				ComponentsByName.Add(ComponentPath, NewComponent);
+			}
+
+			// If this was an instance component, remember it was present in ComponentData.
+			InstanceComponentsByName.Remove(ComponentData.ComponentName);
+		}
+	}
+	
+	// Remove any instance components that existed on the actor but were no longer present in the prefab data.
+	for (const TPair<FString, UActorComponent*>& Pair : InstanceComponentsByName)
+	{
+		UActorComponent* UnusedComponent = Pair.Value;
+		ensure(IsValid(UnusedComponent) && UnusedComponent->IsRegistered());
+		UnusedComponent->UnregisterComponent();
+		UnusedComponent->DestroyComponent();
 	}
 
 	{

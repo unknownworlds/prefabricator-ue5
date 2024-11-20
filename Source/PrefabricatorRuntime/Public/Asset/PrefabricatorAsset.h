@@ -67,12 +67,19 @@ struct PREFABRICATORRUNTIME_API FPrefabricatorComponentData {
 	FString ComponentName;
 
 	UPROPERTY()
+	FString ClassPath;
+
+	UPROPERTY()
+	FSoftClassPath ClassPathRef;
+
+	UPROPERTY()
 	TArray<UPrefabricatorProperty*> Properties;
 
 	inline bool Equals(const FPrefabricatorComponentData& Other) const
 	{
 		bool Equal = ComponentName.Equals(Other.ComponentName)
-		&& RelativeTransform.Equals(Other.RelativeTransform);
+		&& RelativeTransform.Equals(Other.RelativeTransform)
+		&& ClassPathRef == Other.ClassPathRef;
 
 		if(!Equal)
 		{
