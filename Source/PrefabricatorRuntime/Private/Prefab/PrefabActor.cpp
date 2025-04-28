@@ -121,7 +121,7 @@ void APrefabActor::TryLoadPrefab()
 #if WITH_EDITOR
 	//If we're loading in editor we can't mark packages dirty so new and destroyed
 	//actors won't get marked dirty correctly and will be missing from source control
-	if(IsInAsyncLoadingThread() || GIsEditorLoadingPackage)
+	if(IsInAsyncLoadingThread() || UE::GetIsEditorLoadingPackage())
 	{
 		if(!LoadPrefabTimer.IsValid())
 		{

@@ -3,10 +3,20 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "TickableEditorObject.h"
+#include "Containers/Queue.h"
 
 struct FPrefabricatorSelectionRequest {
 	TWeakObjectPtr<AActor> Actor;
 	bool bSelected;
+};
+
+UENUM()
+enum EPrefabricatorSelectMode : uint8
+{
+	Default,		// The default selection mode everyone is used to
+	RootOnly,		// Only select the root actors
+	ComponentOnly	// Only select the component actors
 };
 
 class PREFABRICATOREDITOR_API FPrefabricatorSelectionHook : public FTickableEditorObject {

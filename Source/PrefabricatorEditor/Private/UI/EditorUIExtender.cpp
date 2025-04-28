@@ -9,6 +9,7 @@
 #include "PrefabEditorStyle.h"
 #include "PrefabricatorEditorModule.h"
 #include "Utils/PrefabEditorTools.h"
+#include "PrefabricatorEditor/Public/Utils/SelectionHook.h"
 
 #include "AssetToolsModule.h"
 #include "Editor.h"
@@ -70,6 +71,105 @@ void FEditorUIExtender::Extend()
 				(
 					FExecuteAction::CreateStatic(&FPrefabTools::CreatePrefab)
 				)
+			);
+		}
+
+		static void HandleShowToolbarSelectModeSubMenu_SelectMode(FMenuBuilder& MenuBuilder)
+		{
+			TSharedPtr<SWidget> DefaultMode = SNew(SHorizontalBox)
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(2.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(SCheckBox)
+					.Style(FAppStyle::Get(), "RadioButton")
+					.IsEnabled(false)
+					.IsChecked(IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"))->GetInt() == EPrefabricatorSelectMode::Default)
+				]
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(2.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("SelectModeDefaultText", "Default"))
+				];
+
+			TSharedPtr<SWidget> RootOnly = SNew(SHorizontalBox)
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(2.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(SCheckBox)
+					.Style(FAppStyle::Get(), "RadioButton")
+					.IsEnabled(false)
+					.IsChecked(IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"))->GetInt() == EPrefabricatorSelectMode::RootOnly)
+				]
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(2.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("SelectModePrefabOnlyText", "Root Only"))
+				];
+
+			TSharedPtr<SWidget> ComponentOnly = SNew(SHorizontalBox)
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(2.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(SCheckBox)
+					.Style(FAppStyle::Get(), "RadioButton")
+					.IsEnabled(false)
+					.IsChecked(IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"))->GetInt() == EPrefabricatorSelectMode::ComponentOnly)
+				]
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(2.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("SelectModeComponentOnlyText", "Component Only"))
+				];
+
+			MenuBuilder.AddMenuEntry
+			(
+				FUIAction(
+					FExecuteAction::CreateLambda([]
+					{
+						static const auto CVarSelectMode = IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"));
+						CVarSelectMode->Set(EPrefabricatorSelectMode::Default, ECVF_SetByConsole);
+					})
+				),
+				DefaultMode.ToSharedRef()
+			);
+
+			MenuBuilder.AddMenuEntry
+			(
+				FUIAction(
+					FExecuteAction::CreateLambda([]
+					{
+						static const auto CVarSelectMode = IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"));
+						CVarSelectMode->Set(EPrefabricatorSelectMode::RootOnly, ECVF_SetByConsole);
+					})
+				),
+				RootOnly.ToSharedRef()
+			);
+
+			MenuBuilder.AddMenuEntry
+			(
+				FUIAction(
+					FExecuteAction::CreateLambda([]
+					{
+						static const auto CVarSelectMode = IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"));
+						CVarSelectMode->Set(EPrefabricatorSelectMode::ComponentOnly, ECVF_SetByConsole);
+					})
+				),
+				ComponentOnly.ToSharedRef()
 			);
 		}
 
@@ -188,6 +288,13 @@ void FEditorUIExtender::Extend()
 			MenuBuilder.BeginSection("Prefabricator-Prefabs", LOCTEXT("PrefabHeader", "Prefabs"));
 			MenuBuilder.AddMenuEntry(FPrefabricatorCommands::Get().CreatePrefab);
 			MenuBuilder.EndSection();
+
+			MenuBuilder.AddSubMenu
+			(
+				LOCTEXT("MenuSelectMode", "Select Mode"),
+				LOCTEXT("MenuSelectModeToolTip", "Change how prefabs are selected here!"),
+				FNewMenuDelegate::CreateStatic(&Local::HandleShowToolbarSelectModeSubMenu_SelectMode)
+			);
 
 			MenuBuilder.BeginSection("Prefabricator-Randomization", LOCTEXT("RandomizationHeader", "Randomization"));
 
