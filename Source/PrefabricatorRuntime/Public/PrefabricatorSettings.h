@@ -56,6 +56,9 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = "Thumbnail")
 	float DefaultThumbnailZoom = 0;
 
+	UPROPERTY(config, EditAnywhere, Category = "Editor UI")
+	bool bEnableToolbarExtension = true;
+
 public:
 	UPrefabricatorSettings();
 

@@ -9,9 +9,7 @@
 #include "PrefabEditorStyle.h"
 #include "PrefabricatorEditorModule.h"
 #include "Utils/PrefabEditorTools.h"
-#include "PrefabricatorEditor/Public/Utils/SelectionHook.h"
 
-#include "AssetToolsModule.h"
 #include "Editor.h"
 #include "EditorModeManager.h"
 #include "Engine/Selection.h"
@@ -20,26 +18,15 @@
 #include "Framework/Commands/UICommandList.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Framework/MultiBox/MultiBoxExtender.h"
-#include "Framework/Notifications/NotificationManager.h"
 #include "Framework/SlateDelegates.h"
 #include "LevelEditor.h"
+#include "PrefabricatorSettings.h"
 #include "ToolMenuEntry.h"
 #include "ToolMenus.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/SNullWidget.h"
 
 #define LOCTEXT_NAMESPACE "EditorUIExtender" 
-
-namespace PrefabURLs {
-	// TODO: move me to a configuration file
-	static const FString URL_UserGuide	= "https://docs.prefabricator.dev";
-	static const FString URL_Website	= "https://prefabricator.dev";
-	static const FString URL_Discord	= "https://discord.gg/dRewTSU";
-	static const FString URL_DevForum	= "https://forums.unrealengine.com/search?q=prefabricator&searchJSON=%7B%22keywords%22%3A%22prefabricator%22%7D";
-
-	static const FString PATH_SAMPLE_PLATFORMER = "/Prefabricator/Samples/PF_GamePlatformer/Maps/PFGame_Platformer";
-	static const FString PATH_SAMPLE_CONSTRUCTION = "/Prefabricator/Samples/PF_Construction/Maps/PFConstructionDemo";
-}
 
 void FEditorUIExtender::Extend()
 {
@@ -62,115 +49,90 @@ void FEditorUIExtender::Extend()
 		}
 
 		static void CreateActionMenu(class FMenuBuilder& MenuBuilder, const TArray<AActor*> SelectedActors) {
-			MenuBuilder.AddMenuEntry
+			FPrefabricatorEditorModule& Module = FPrefabricatorEditorModule::Get();
+
+			MenuBuilder.AddSubMenu
 			(
-				LOCTEXT("PrefabTabTitle", "Create Prefab (from selection)"),
-				LOCTEXT("PrefabTooltipText", "Create a new prefab from the current selection"),
-				FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "Prefabricator.ContextMenu.Icon"),
-				FUIAction
+			LOCTEXT("PrefabTabTitle", "Create Prefab (from selection)"),
+			LOCTEXT("PrefabTooltipText", "Create a new prefab from the current selection"),
+			FNewMenuDelegate::CreateRaw(&Module, &FPrefabricatorEditorModule::CreatePathPickerSubMenu),
+			false,
+			FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "Prefabricator.ContextMenu.Icon")
+			);
+
+			if (APrefabActor* PrefabActor = Module.GetActivePrefabActor())
+			{
+				FString FormattedString = FString::Printf(TEXT("Add to Active Prefab (%s)"), *PrefabActor->GetActorLabel());
+				MenuBuilder.AddMenuEntry
 				(
-					FExecuteAction::CreateStatic(&FPrefabTools::CreatePrefab)
-				)
-			);
-		}
+					FText::FromString(FormattedString),
+					LOCTEXT("AddToPrefabTooltipText", "Adds selection to active prefab"),
+					FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "Prefabricator.ContextMenu.Icon"),
+					FUIAction
+					(
+						FExecuteAction::CreateLambda([]()
+							{
+								FPrefabricatorEditorModule& Module = FPrefabricatorEditorModule::Get();
+								if (APrefabActor* PrefabActor = Module.GetActivePrefabActor())
+								{
+									FPrefabTools::AddSelectedActorsToPrefab(PrefabActor);
 
-		static void HandleShowToolbarSelectModeSubMenu_SelectMode(FMenuBuilder& MenuBuilder)
-		{
-			TSharedPtr<SWidget> DefaultMode = SNew(SHorizontalBox)
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.0f)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SCheckBox)
-					.Style(FAppStyle::Get(), "RadioButton")
-					.IsEnabled(false)
-					.IsChecked(IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"))->GetInt() == EPrefabricatorSelectMode::Default)
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.0f)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("SelectModeDefaultText", "Default"))
-				];
+									// select the prefab
+									GEditor->SelectActor(PrefabActor, true, true);
+								}
+							})
+					));
+			}
 
-			TSharedPtr<SWidget> RootOnly = SNew(SHorizontalBox)
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.0f)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SCheckBox)
-					.Style(FAppStyle::Get(), "RadioButton")
-					.IsEnabled(false)
-					.IsChecked(IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"))->GetInt() == EPrefabricatorSelectMode::RootOnly)
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.0f)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("SelectModePrefabOnlyText", "Root Only"))
-				];
+			if (FPrefabTools::HasPrefabSelected())
+			{
+				MenuBuilder.AddMenuEntry(
+					LOCTEXT("SetActivePrefabLabel", "Set Active Prefab"),
+					LOCTEXT("SetActivePrefabTooltipText", "Set the active prefab. All newly placed actors will be added to this prefab."),
+					FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "Prefabricator.ContextMenu.Icon"),
+					FUIAction(
+						FExecuteAction::CreateLambda([]()
+							{
+								FPrefabricatorEditorModule& Module = FPrefabricatorEditorModule::Get();
 
-			TSharedPtr<SWidget> ComponentOnly = SNew(SHorizontalBox)
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.0f)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SCheckBox)
-					.Style(FAppStyle::Get(), "RadioButton")
-					.IsEnabled(false)
-					.IsChecked(IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"))->GetInt() == EPrefabricatorSelectMode::ComponentOnly)
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.0f)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("SelectModeComponentOnlyText", "Component Only"))
-				];
+								if (APrefabActor* SelectedPrefab = FPrefabTools::GetSelectedPrefab())
+								{
+									Module.SetActivePrefabActor(SelectedPrefab);
+								}
+							})
+						));
+			}
 
-			MenuBuilder.AddMenuEntry
-			(
-				FUIAction(
-					FExecuteAction::CreateLambda([]
-					{
-						static const auto CVarSelectMode = IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"));
-						CVarSelectMode->Set(EPrefabricatorSelectMode::Default, ECVF_SetByConsole);
-					})
-				),
-				DefaultMode.ToSharedRef()
-			);
+			if (Module.GetActivePrefabActor() != nullptr) {
+				MenuBuilder.AddMenuEntry(
+					LOCTEXT("SelectActivePrefabLabel", "Select Active Prefab"),
+					LOCTEXT("SelectActivePrefabTooltipText", "Select the active prefab."),
+					FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "Prefabricator.ContextMenu.Icon"),
+					FUIAction(
+						FExecuteAction::CreateLambda([]()
+							{
+								FPrefabricatorEditorModule& Module = FPrefabricatorEditorModule::Get();
+								if (APrefabActor* SelectedPrefab = Module.GetActivePrefabActor())
+								{
+									GEditor->SelectActor(SelectedPrefab, true, true);
+								}
+							})
+						));
+				
+				MenuBuilder.AddMenuEntry(
+					LOCTEXT("ClearActivePrefabLabel", "Clear Active Prefab"),
+					LOCTEXT("ClearActivePrefabTooltipText", "Clear the active prefab. New actors will no longer be added to any prefab."),
+					FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "Prefabricator.ContextMenu.Icon"),
+					FUIAction(
+						FExecuteAction::CreateLambda([]()
+							{
+								FPrefabricatorEditorModule& Module = FPrefabricatorEditorModule::Get();
+								Module.ClearActivePrefab();
+							})
+						));
+			}
 
-			MenuBuilder.AddMenuEntry
-			(
-				FUIAction(
-					FExecuteAction::CreateLambda([]
-					{
-						static const auto CVarSelectMode = IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"));
-						CVarSelectMode->Set(EPrefabricatorSelectMode::RootOnly, ECVF_SetByConsole);
-					})
-				),
-				RootOnly.ToSharedRef()
-			);
-
-			MenuBuilder.AddMenuEntry
-			(
-				FUIAction(
-					FExecuteAction::CreateLambda([]
-					{
-						static const auto CVarSelectMode = IConsoleManager::Get().FindConsoleVariable(TEXT("Prefabricator.Select.Mode"));
-						CVarSelectMode->Set(EPrefabricatorSelectMode::ComponentOnly, ECVF_SetByConsole);
-					})
-				),
-				ComponentOnly.ToSharedRef()
-			);
+			MenuBuilder.EndSection();
 		}
 
 		static void LinkSelectedPrefabSeeds(APrefabSeedLinker* SeedLinker) {
@@ -222,7 +184,7 @@ void FEditorUIExtender::Extend()
 		}
 
 		static void UpgradeAssets() {
-			IPrefabricatorEditorModule::Get().UpgradePrefabAssets();
+			FPrefabricatorEditorModule::Get().UpgradePrefabAssets();
 		}
 
 		static void OpenSample(FString InPath) {
@@ -240,22 +202,6 @@ void FEditorUIExtender::Extend()
 			}
 		}
 
-		static void HandleShowToolbarPrefabSubMenu_Community(FMenuBuilder& MenuBuilder) {
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("CommunityForumLabel", "Development Forum"),
-				LOCTEXT("CommunityForumTooltip", "Follow along the development of the plugin and post your queries here"),
-				FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "ClassIcon.Unreal"),
-				FUIAction(FExecuteAction::CreateStatic(&Local::LaunchURL, PrefabURLs::URL_DevForum))
-			);
-
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("CommunityDiscordLabel", "Discord Chat"),
-				LOCTEXT("CommunityDiscordTooltip", "Chat with the community and post your queries here"),
-				FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "ClassIcon.Discord"),
-				FUIAction(FExecuteAction::CreateStatic(&Local::LaunchURL, PrefabURLs::URL_Discord))
-			);
-		}
-
 		static void HandleShowToolbarPrefabSubMenu_Advanced(FMenuBuilder& MenuBuilder) {
 			MenuBuilder.AddMenuEntry(
 				LOCTEXT("AdvancedUpgradeLabel", "Upgrade assets to latest version"),
@@ -266,22 +212,6 @@ void FEditorUIExtender::Extend()
 
 		}
 
-		static void HandleShowToolbarPrefabSubMenu_OpenSamples(FMenuBuilder& MenuBuilder) {
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("SamplePlatformerLabel", "Platformer Game Demo"),
-				LOCTEXT("SamplePlatformerTooltip", "Demostrates how to build a procedural platformer level with thousands of layout variations"),
-				FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "ClassIcon.Unreal"),
-				FUIAction(FExecuteAction::CreateStatic(&Local::OpenSample, PrefabURLs::PATH_SAMPLE_PLATFORMER))
-			);
-
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("SampleConstructionLabel", "Construction System Demo"),
-				LOCTEXT("SampleConstructionTooltip", "Allow your players to build their own worlds using the Construction System"),
-				FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "ClassIcon.Unreal"),
-				FUIAction(FExecuteAction::CreateStatic(&Local::OpenSample, PrefabURLs::PATH_SAMPLE_CONSTRUCTION))
-			);
-		}
-
 		static TSharedRef<SWidget> HandleShowToolbarPrefabMenu() {
 			FMenuBuilder MenuBuilder(true, FPrefabricatorCommands::Get().LevelMenuActionList);
 
@@ -289,50 +219,21 @@ void FEditorUIExtender::Extend()
 			MenuBuilder.AddMenuEntry(FPrefabricatorCommands::Get().CreatePrefab);
 			MenuBuilder.EndSection();
 
-			MenuBuilder.AddSubMenu
-			(
-				LOCTEXT("MenuSelectMode", "Select Mode"),
-				LOCTEXT("MenuSelectModeToolTip", "Change how prefabs are selected here!"),
-				FNewMenuDelegate::CreateStatic(&Local::HandleShowToolbarSelectModeSubMenu_SelectMode)
-			);
-
 			MenuBuilder.BeginSection("Prefabricator-Randomization", LOCTEXT("RandomizationHeader", "Randomization"));
 
 			MenuBuilder.AddSubMenu(
 				LOCTEXT("MenuLinkSeeds", "Link selected Prefab Collection seeds"),
-				LOCTEXT("MenuLinkSeedsTooltip", "Links the selected prefab collection seeds to an existinga Seed Linker Actor in the scene"),
+				LOCTEXT("MenuLinkSeedsTooltip", "Links the selected prefab collection seeds to an existing Seed Linker Actor in the scene"),
 				FNewMenuDelegate::CreateStatic(&Local::HandleShowToolbarPrefabSubMenu_LinkPrefabSeeds)
 			);
 
 			MenuBuilder.EndSection();
 
 			MenuBuilder.BeginSection("Prefabricator-Help", LOCTEXT("HelpHeader", "Help / Support"));
-
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("UserGuideLabel", "User Guide"),
-				LOCTEXT("UserGuideTooltip", "Detailed user guide for prefabricator"),
-				FSlateIcon(FPrefabEditorStyle::Get().GetStyleSetName(), "ClassIcon.UE"),
-				FUIAction(FExecuteAction::CreateStatic(&Local::LaunchURL, PrefabURLs::URL_UserGuide))
-			);
-
-			MenuBuilder.AddSubMenu(
-				LOCTEXT("MenuCommunity", "Community"),
-				LOCTEXT("MenuCommunityTooltip", "Get support from the developer and community"),
-				FNewMenuDelegate::CreateStatic(&Local::HandleShowToolbarPrefabSubMenu_Community)
-			);
-
 			MenuBuilder.AddSubMenu(
 				LOCTEXT("MenuAdvanced", "Advanced"),
 				LOCTEXT("MenuAdvancedTooltip", "Advanced options"),
 				FNewMenuDelegate::CreateStatic(&Local::HandleShowToolbarPrefabSubMenu_Advanced)
-			);
-			MenuBuilder.EndSection();
-
-			MenuBuilder.BeginSection("Prefabricator-Samples", LOCTEXT("SamplesHeader", "Samples"));
-			MenuBuilder.AddSubMenu(
-				LOCTEXT("MenuOpenSamples", "Open Sample"),
-				LOCTEXT("MenuOpenSamplesTooltip", "Open a sample map"),
-				FNewMenuDelegate::CreateStatic(&Local::HandleShowToolbarPrefabSubMenu_OpenSamples)
 			);
 			MenuBuilder.EndSection();
 
@@ -355,19 +256,21 @@ void FEditorUIExtender::Extend()
 	MenuExtenders.Add(FLevelEditorModule::FLevelViewportMenuExtender_SelectedActors::CreateStatic(&Local::OnExtendLevelEditorActorContextMenu));
 	LevelViewportExtenderHandle = MenuExtenders.Last().GetHandle();
 
-	UToolMenu* AssetsToolBar = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.AssetsToolBar");
-	if (AssetsToolBar) {
-		FToolMenuSection& Section = AssetsToolBar->AddSection("Prefabricator");
-		const FToolMenuEntry LaunchPadEntry = FToolMenuEntry::InitComboButton("Prefabricator",
-																				FUIAction(),
-																				FOnGetContent::CreateStatic(&Local::HandleShowToolbarPrefabMenu),
-																				LOCTEXT("PrefabricatorToolbarButtonText", "Prefabricator"),
-																				LOCTEXT("DAToolbarButtonTooltip", "Prefabricator Menu"),
-																				FSlateIcon(FPrefabEditorStyle::GetStyleSetName(), TEXT("Prefabricator.CreatePrefab")));
-		Section.AddEntry(LaunchPadEntry);
+	const UPrefabricatorSettings* PS = GetDefault<UPrefabricatorSettings>();
+	if (PS->bEnableToolbarExtension)
+	{
+		UToolMenu* AssetsToolBar = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.AssetsToolBar");
+		if (AssetsToolBar) {
+			FToolMenuSection& Section = AssetsToolBar->AddSection("Prefabricator");
+			const FToolMenuEntry LaunchPadEntry = FToolMenuEntry::InitComboButton("Prefabricator",
+																					FUIAction(),
+																					FOnGetContent::CreateStatic(&Local::HandleShowToolbarPrefabMenu),
+																					LOCTEXT("PrefabricatorToolbarButtonText", "Prefabricator"),
+																					LOCTEXT("DAToolbarButtonTooltip", "Prefabricator Menu"),
+																					FSlateIcon(FPrefabEditorStyle::GetStyleSetName(), TEXT("Prefabricator.CreatePrefab")));
+			Section.AddEntry(LaunchPadEntry);
+		}	
 	}
-	
-	
 }
 
 void FEditorUIExtender::Release()

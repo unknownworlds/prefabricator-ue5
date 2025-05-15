@@ -3,6 +3,7 @@
 #include "Utils/PrefabricatorService.h"
 
 #include "Engine/EngineTypes.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 
 /////////////////////////// FPrefabricatorService /////////////////////////// 
@@ -35,6 +36,7 @@ AActor* IPrefabricatorService::SpawnActor(TSubclassOf<AActor> InClass, const FTr
 	UWorld* World = InLevel->GetWorld();
 	AActor* Actor = World->SpawnActor<AActor>(InClass, SpawnParams);
 	Actor->SetActorTransform(FTransform::Identity);
+	
 	Actor->FinishSpawning(InTransform);
 	Actor->DetachFromActor(FDetachmentTransformRules(EDetachmentRule::KeepWorld, false));
 
@@ -63,7 +65,7 @@ int FPrefabricatorRuntimeService::GetNumSelectedActors()
 	return 0;
 }
 
-UPrefabricatorAsset* FPrefabricatorRuntimeService::CreatePrefabAsset()
+UPrefabricatorAsset* FPrefabricatorRuntimeService::CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName)
 {
 	// Not supported in runtime builds (and not necessary)
 	return nullptr;

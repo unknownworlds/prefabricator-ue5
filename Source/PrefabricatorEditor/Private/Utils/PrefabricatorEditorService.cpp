@@ -99,14 +99,13 @@ int FPrefabricatorEditorService::GetNumSelectedActors()
 	return GEditor ? GEditor->GetSelectedActorCount() : 0;
 }
 
-UPrefabricatorAsset* FPrefabricatorEditorService::CreatePrefabAsset()
+UPrefabricatorAsset* FPrefabricatorEditorService::CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName)
 {
-	return FPrefabEditorTools::CreatePrefabAsset();
+	return FPrefabEditorTools::CreatePrefabAsset(AssetClass, SavePath, InAssetName);
 }
 
 FVector FPrefabricatorEditorService::SnapToGrid(const FVector& InLocation)
 {
-	auto& Settings = GetDefault<ULevelEditorViewportSettings>()->SnapToSurface;
 	if (GEditor) {
 		float GridSize = GEditor->GetGridSize();
 #define PF_SNAP_TO_GRID(X) FMath::RoundToInt((X) / GridSize) * GridSize
@@ -117,9 +116,8 @@ FVector FPrefabricatorEditorService::SnapToGrid(const FVector& InLocation)
 #undef PF_SNAP_TO_GRID
 		return SnappedLocation;
 	}
-	else {
-		return InLocation;
-	}
+	
+	return InLocation;
 }
 
 void FPrefabricatorEditorService::SetDetailsViewObject(UObject* InObject)

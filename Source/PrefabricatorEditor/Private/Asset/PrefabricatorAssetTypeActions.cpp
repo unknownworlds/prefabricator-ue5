@@ -55,7 +55,7 @@ class UThumbnailInfo* FPrefabricatorAssetTypeActions::GetThumbnailInfo(UObject* 
 uint32 FPrefabricatorAssetTypeActions::GetCategories()
 {
 	return EAssetTypeCategories::Misc |
-		IPrefabricatorEditorModule::Get().GetPrefabricatorAssetCategoryBit();
+		FPrefabricatorEditorModule::Get().GetPrefabricatorAssetCategoryBit();
 }
 
 FText FPrefabricatorAssetTypeActions::GetDisplayNameFromAssetData(const FAssetData& AssetData) const
@@ -218,7 +218,7 @@ void FPrefabricatorAssetCollectionTypeActions::OpenAssetEditor(const TArray<UObj
 uint32 FPrefabricatorAssetCollectionTypeActions::GetCategories()
 {
 	return EAssetTypeCategories::Misc |
-		IPrefabricatorEditorModule::Get().GetPrefabricatorAssetCategoryBit();
+		FPrefabricatorEditorModule::Get().GetPrefabricatorAssetCategoryBit();
 }
 
 #undef LOCTEXT_NAMESPACE

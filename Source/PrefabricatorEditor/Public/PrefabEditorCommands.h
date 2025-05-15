@@ -5,6 +5,7 @@
 #include "Framework/Commands/Commands.h"
 #include "Framework/Commands/UICommandInfo.h"
 
+class APrefabActor;
 class PREFABRICATOREDITOR_API FPrefabricatorCommands : public TCommands<FPrefabricatorCommands>
 {
 public:
@@ -13,10 +14,11 @@ public:
 	virtual void RegisterCommands() override;
 
 public:
-
 	TSharedPtr<FUICommandInfo> CreatePrefab;
+	TSharedPtr<FUICommandInfo> AddSelectedToActivePrefab;
+	TSharedPtr<FUICommandInfo> SetActivePrefab;
+	TSharedPtr<FUICommandInfo> ClearActivePrefab;
 	TSharedPtr<class FUICommandList> LevelMenuActionList;
-
 };
 
 

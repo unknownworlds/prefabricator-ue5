@@ -193,6 +193,11 @@ void APrefabActor::HandleBuildComplete()
 	}
 }
 
+TSubclassOf<UPrefabricatorAsset> APrefabActor::GetPrefabAssetClass() const
+{
+	return UPrefabricatorAsset::StaticClass();
+}
+
 #if WITH_EDITOR
 void APrefabActor::SetIsTemporarilyHiddenInEditor(bool bIsHidden)
 {

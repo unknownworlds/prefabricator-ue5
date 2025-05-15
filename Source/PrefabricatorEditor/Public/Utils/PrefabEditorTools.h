@@ -22,7 +22,9 @@ public:
 	static void AssignPrefabAssetThumbnail(UPrefabricatorAssetInterface* InAsset, UTexture2D* ThumbTexture);
 
 	static UThumbnailInfo* CreateDefaultThumbInfo(UPrefabricatorAsset* InAsset);
-	static UPrefabricatorAsset* CreatePrefabAsset();
+
+	static UPrefabricatorAsset* CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName);
+	
 	static UPrefabricatorAssetCollection* CreatePrefabCollectionAsset();
 
 };

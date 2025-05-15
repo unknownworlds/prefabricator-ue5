@@ -185,6 +185,7 @@ void UPrefabricatorProperty::LoadReferencedAssetValues()
 {
 	SCOPE_CYCLE_COUNTER(STAT_LoadReferencedAssetValues);
 	bool bModified = false;
+	
 	for (FPrefabricatorPropertyAssetMapping& Mapping : AssetSoftReferenceMappings) {
 		// Check if the name has changed
 		//if (!Mapping.AssetReference.IsValid()) {
