@@ -37,7 +37,6 @@ namespace UnrealBuildTool.Rules
                     "AdvancedPreviewScene",
                     "Kismet",
                     "PlacementMode",
-					"EditorFramework",
                     "EditorWidgets",
                     "RHI",
                     "ToolMenus",             

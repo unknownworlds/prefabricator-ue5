@@ -2,26 +2,14 @@
 
 #include "Utils/SelectionHook.h"
 
-#include "Asset/PrefabricatorAssetUserData.h"
 #include "Prefab/PrefabActor.h"
 
 #include "Editor/EditorEngine.h"
 #include "Engine/Selection.h"
 #include "GameFramework/Actor.h"
-#include "Editor.h"
-#include "EditorModeManager.h"
-#include "EditorModes.h"
 
+class FPrefabricatorEditorModule;
 DEFINE_LOG_CATEGORY_STATIC(LogPrefabricatorSelectionHook, Log, All);
-
-#if WITH_EDITOR
-static TAutoConsoleVariable<int> CVarSelectMode(
-	TEXT("Prefabricator.Select.Mode"),
-	EPrefabricatorSelectMode::Default,
-	TEXT("Changes prefabricator selections. 0=default, 1=prefabs only, 2=components only"),
-	ECVF_Default
-);
-#endif
 
 void FPrefabricatorSelectionHook::Initialize()
 {
@@ -109,17 +97,11 @@ void FPrefabricatorSelectionHook::OnObjectSelected(UObject* Object)
 		return;
 	}
 
-	// Check if mesh painting or only getting components
-	if (CVarSelectMode.GetValueOnGameThread() == EPrefabricatorSelectMode::ComponentOnly || GLevelEditorModeTools().IsModeActive(FName(TEXT("MeshPaintMode")))) {
-		LastSelectedObject = RequestedActor;
-		return;
-	}
-
 	AActor* CustomSelection = nullptr;
 
 	bool bIsInHierarchy = LastSelectedObject.IsValid() && IsInHierarchy(RequestedActor, LastSelectedObject.Get());
 
-	if (!bIsInHierarchy || CVarSelectMode.GetValueOnGameThread() == EPrefabricatorSelectMode::RootOnly) {
+	if (!bIsInHierarchy) {
 		// Select the outermost prefab actor, if available
 		APrefabActor* OutermostPrefab = GetOutermostPrefab(RequestedActor);
 		if (OutermostPrefab) {
@@ -144,7 +126,6 @@ void FPrefabricatorSelectionHook::OnObjectSelected(UObject* Object)
 	else {
 		LastSelectedObject = RequestedActor;
 	}
-
 }
 
 void FPrefabricatorSelectionHook::OnSelectNone()

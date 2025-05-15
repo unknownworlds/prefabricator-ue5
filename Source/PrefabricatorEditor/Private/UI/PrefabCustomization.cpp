@@ -62,7 +62,7 @@ void FPrefabActorCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailBui
 		}
 
 	}
-	FPrefabDetailsExtend& ExtenderDelegate = IPrefabricatorEditorModule::Get().GetPrefabActorDetailsExtender();
+	FPrefabDetailsExtend& ExtenderDelegate = FPrefabricatorEditorModule::Get().GetPrefabActorDetailsExtender();
 
 	
 	if(ExtenderDelegate.IsBound())
@@ -199,7 +199,8 @@ FReply FPrefabActorCustomization::HandleSaveToNewAsset(IDetailLayoutBuilder* Det
 
 			if(Children.Num() > 0) {
 				FPrefabTools::UnlinkAndDestroyPrefabActor(PrefabActor);
-				FPrefabTools::CreatePrefabFromActors(Children);
+				// TODO (sylviacx): default path and asset name
+				FPrefabTools::CreatePrefabFromActors(PrefabActor->GetPrefabAsset()->GetClass(), PrefabActor->GetClass(), "/Game", "PA_Prefab", Children);
 			}
 		}
 	}

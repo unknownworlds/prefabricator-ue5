@@ -28,11 +28,18 @@ UObject* UPrefabricatorActorFactory::GetAssetFromActorInstance(AActor* ActorInst
 }
 
 AActor* UPrefabricatorActorFactory::SpawnActor(UObject* InAsset, ULevel* InLevel, const FTransform& InTransform, const FActorSpawnParameters& InSpawnParams) {
-	AActor* Actor = UActorFactory::SpawnActor(InAsset, InLevel, InTransform, InSpawnParams);
-	if (const APrefabActor* PrefabActor = Cast<APrefabActor>(Actor)) {
-		PrefabActor->PrefabComponent->PrefabAssetInterface = Cast<UPrefabricatorAssetInterface>(InAsset);
+	if (UPrefabricatorAsset* PrefabAsset = Cast<UPrefabricatorAsset>(InAsset)) {
+		if (PrefabAsset->ActorClass) {
+			NewActorClass = PrefabAsset->ActorClass;
+		}
+
+		AActor* Actor = UActorFactory::SpawnActor(InAsset, InLevel, InTransform, InSpawnParams);
+		if (const APrefabActor* PrefabActor = Cast<APrefabActor>(Actor)) {
+			PrefabActor->PrefabComponent->PrefabAssetInterface = Cast<UPrefabricatorAssetInterface>(InAsset);
+		}
+		return Actor;
 	}
-	return Actor;
+	return nullptr;
 }
 
 void UPrefabricatorActorFactory::LoadPrefabActorState(APrefabActor* PrefabActor)

@@ -43,6 +43,9 @@ public:
 	UPROPERTY()
 	FGuid CrossReferencePrefabActorId;
 
+	UPROPERTY()
+	TArray<FGuid> CrossReferencePrefabActorIds;
+
 	void SaveReferencedAssetValues();
 	void LoadReferencedAssetValues();
 
@@ -228,6 +231,9 @@ class PREFABRICATORRUNTIME_API UPrefabricatorAsset : public UPrefabricatorAssetI
 public:
 	UPROPERTY()
 	TArray<FPrefabricatorActorData> ActorData;
+
+	UPROPERTY()
+	TSubclassOf<APrefabActor> ActorClass;
 
 	UPROPERTY()
 	TEnumAsByte<EComponentMobility::Type> PrefabMobility;

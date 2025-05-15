@@ -49,6 +49,8 @@ public:
 	void RandomizeSeed(const FRandomStream& InRandom, bool bRecursive = true);
 	void HandleBuildComplete();
 
+	virtual TSubclassOf<UPrefabricatorAsset> GetPrefabAssetClass() const;
+
 #if WITH_EDITOR
 	virtual void SetIsTemporarilyHiddenInEditor(bool bIsHidden) override;
 #endif
@@ -59,6 +61,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Prefabricator")
 	int32 Seed;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY()
+	bool bIsSourceControlled = true;
+#endif
 };
 
 /////////////////////////////// BuildSystem /////////////////////////////// 

@@ -22,6 +22,7 @@
 #include "Engine/World.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogPrefabTools, Log, All);
+FOnUnlinkChildFromPrefab FPrefabTools::OnUnlinkChildFromPrefab;
 
 #define LOCTEXT_NAMESPACE "PrefabTools"
 
@@ -66,10 +67,10 @@ void FPrefabTools::SelectPrefabActor(AActor* PrefabActor)
 	}
 }
 
-UPrefabricatorAsset* FPrefabTools::CreatePrefabAsset()
+UPrefabricatorAsset* FPrefabTools::CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName)
 {
 	TSharedPtr<IPrefabricatorService> Service = FPrefabricatorService::Get();
-	return Service.IsValid() ? Service->CreatePrefabAsset() : nullptr;
+	return Service.IsValid() ? Service->CreatePrefabAsset(AssetClass, SavePath, InAssetName) : nullptr;
 }
 
 int32 FPrefabTools::GetRandomSeed(const FRandomStream& InRandom)
@@ -108,12 +109,53 @@ bool FPrefabTools::CanCreatePrefab()
 	return GetNumSelectedActors() > 0;
 }
 
-void FPrefabTools::CreatePrefab()
+bool FPrefabTools::HasPrefabSelected()
+{
+	// return true if there is only one selected actor and it is a prefab
+	TArray<AActor*> SelectedActors;
+	GetSelectedActors(SelectedActors);
+
+	if (SelectedActors.Num() == 1)
+	{
+		if (APrefabActor* PrefabActor = Cast<APrefabActor>(SelectedActors[0]))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+APrefabActor* FPrefabTools::GetSelectedPrefab()
 {
 	TArray<AActor*> SelectedActors;
 	GetSelectedActors(SelectedActors);
 
-	CreatePrefabFromActors(SelectedActors);
+	if (SelectedActors.Num() == 1)
+	{
+		if (APrefabActor* PrefabActor = Cast<APrefabActor>(SelectedActors[0]))
+		{
+			return PrefabActor;
+		}
+	}
+
+	return nullptr;
+}
+
+void FPrefabTools::CreatePrefab(const FString& SavePath, const FString& InAssetName)
+{
+	TArray<AActor*> SelectedActors;
+	GetSelectedActors(SelectedActors);
+
+	CreatePrefabFromActors(UPrefabricatorAsset::StaticClass(), APrefabActor::StaticClass(), SavePath, InAssetName, SelectedActors);
+}
+
+void FPrefabTools::CreatePrefabAtDefaultPath()
+{
+	TArray<AActor*> SelectedActors;
+	GetSelectedActors(SelectedActors);
+
+	CreatePrefabFromActors(UPrefabricatorAsset::StaticClass(), APrefabActor::StaticClass(), "/Game", "PA_Prefab", SelectedActors);
 }
 
 namespace {
@@ -148,7 +190,7 @@ namespace {
 	}
 }
 
-APrefabActor* FPrefabTools::CreatePrefabFromActors(const TArray<AActor*>& InActors)
+APrefabActor* FPrefabTools::CreatePrefabFromActors(TSubclassOf<UPrefabricatorAsset> AssetClass, TSubclassOf<APrefabActor> ActorClass, const FString& SavePath, const FString& InAssetName, const TArray<AActor*>& InActors)
 {
 	TArray<AActor*> Actors;
 	SanitizePrefabActorsForCreation(InActors, Actors);
@@ -157,10 +199,12 @@ APrefabActor* FPrefabTools::CreatePrefabFromActors(const TArray<AActor*>& InActo
 		return nullptr;
 	}
 
-	UPrefabricatorAsset* PrefabAsset = CreatePrefabAsset();
+	UPrefabricatorAsset* PrefabAsset = CreatePrefabAsset(AssetClass, SavePath, InAssetName);
 	if (!PrefabAsset) {
 		return nullptr;
 	}
+
+	PrefabAsset->ActorClass = ActorClass;
 
 	TSharedPtr<IPrefabricatorService> Service = FPrefabricatorService::Get();
 	if (Service.IsValid()) {
@@ -189,7 +233,17 @@ APrefabActor* FPrefabTools::CreatePrefabFromActors(const TArray<AActor*>& InActo
 	{
 		Pivot = FPrefabricatorAssetUtils::FindPivot(Actors);
 	}
-	APrefabActor* PrefabActor = World->SpawnActor<APrefabActor>(Pivot, FRotator::ZeroRotator);
+	
+	AActor* SpawnedActor = World->SpawnActor(ActorClass, &Pivot, &FRotator::ZeroRotator);
+	if (!SpawnedActor) {
+		return nullptr;
+	}
+
+	APrefabActor* PrefabActor = Cast<APrefabActor>(SpawnedActor);
+	if (!PrefabActor) {
+		UE_LOG(LogPrefabTools, Error, TEXT("Failed to create prefab actor"));
+		return nullptr;
+	}
 
 	// Find the compatible mobility for the prefab actor
 	EComponentMobility::Type Mobility = FPrefabricatorAssetUtils::FindMobility(Actors);
@@ -479,20 +533,12 @@ namespace {
 				continue;
 			}
 
-			bool bForceSerialize = FPrefabTools::ShouldForcePropertySerialization(Property->GetFName());
-
-			// Check if it has the default value
-			if (!bForceSerialize && HasDefaultValue(ObjToSerialize, ObjTemplate, Property->GetName())) {
-				continue;
-			}
-
 			if (const FObjectProperty* ObjProperty = CastField<FObjectProperty>(Property)) {
 				UObject* PropertyObjectValue = ObjProperty->GetObjectPropertyValue_InContainer(ObjToSerialize);
 				if (PropertyObjectValue && PropertyObjectValue->HasAnyFlags(RF_DefaultSubObject | RF_ArchetypeObject)) {
 					continue;
 				}
 			}
-
 
 			PropertiesToSerialize.Add(Property);
 		}
@@ -533,6 +579,62 @@ namespace {
 					}
 				}
 			}
+
+			// if the property is an array of objects, check for cross references
+			if (const FArrayProperty* ArrayProperty = CastField<FArrayProperty>(Property))
+			{
+				if (const FSoftObjectProperty* InnerObjProperty = CastField<FSoftObjectProperty>(ArrayProperty->Inner))
+				{
+					PrefabProperty->bIsCrossReferencedActor = true;
+						
+					FScriptArrayHelper ArrayHelper(ArrayProperty, ArrayProperty->ContainerPtrToValuePtr<void>(ObjToSerialize));
+					for (int32 ArrayIndex = 0; ArrayIndex < ArrayHelper.Num(); ArrayIndex++)
+					{
+						UObject* PropertyObjectValue = InnerObjProperty->GetObjectPropertyValue(ArrayHelper.GetRawPtr(ArrayIndex));
+						if (PropertyObjectValue)
+						{
+							if (PropertyObjectValue->HasAnyFlags(RF_DefaultSubObject | RF_ArchetypeObject))
+							{
+								continue;
+							}
+
+							FString ObjectPath = PropertyObjectValue->GetPathName();
+							FGuid CrossRefPrefabItem;
+							if (CrossReferences.GetPrefabItemId(ObjectPath, CrossRefPrefabItem))
+							{
+								PrefabProperty->CrossReferencePrefabActorIds.Add(CrossRefPrefabItem);
+								bFoundCrossReference = true;
+							}
+						}
+					}
+				}
+				
+				if (const FWeakObjectProperty* InnerObjProperty = CastField<FWeakObjectProperty>(ArrayProperty->Inner))
+				{
+					PrefabProperty->bIsCrossReferencedActor = true;
+						
+					FScriptArrayHelper ArrayHelper(ArrayProperty, ArrayProperty->ContainerPtrToValuePtr<void>(ObjToSerialize));
+					for (int32 ArrayIndex = 0; ArrayIndex < ArrayHelper.Num(); ArrayIndex++)
+					{
+						UObject* PropertyObjectValue = InnerObjProperty->GetObjectPropertyValue(ArrayHelper.GetRawPtr(ArrayIndex));
+						if (PropertyObjectValue)
+						{
+							if (PropertyObjectValue->HasAnyFlags(RF_DefaultSubObject | RF_ArchetypeObject))
+							{
+								continue;
+							}
+
+							FString ObjectPath = PropertyObjectValue->GetPathName();
+							FGuid CrossRefPrefabItem;
+							if (CrossReferences.GetPrefabItemId(ObjectPath, CrossRefPrefabItem))
+							{
+								PrefabProperty->CrossReferencePrefabActorIds.Add(CrossRefPrefabItem);
+								bFoundCrossReference = true;
+							}
+						}
+					}
+				}
+			}	
 
 			// Save as usual if no cross reference was found
 			if (!bFoundCrossReference) {
@@ -605,6 +707,18 @@ bool FPrefabTools::ShouldForcePropertySerialization(const FName& PropertyName)
 	};
 
 	return FieldsToForceSerialize.Contains(PropertyName);
+}
+
+void FPrefabTools::AddSelectedActorsToPrefab(APrefabActor* PrefabActor)
+{
+	TArray<AActor*> SelectedActors;
+	GetSelectedActors(SelectedActors);
+
+	for (AActor* Actor : SelectedActors) {
+		if (IsValid(Actor)) {
+			ParentActors(PrefabActor, Actor);
+		}
+	}
 }
 
 namespace {
@@ -847,8 +961,13 @@ void FPrefabTools::UnlinkAndDestroyPrefabActor(APrefabActor* PrefabActor)
 
 	// Detach them from the prefab actor and cleanup
 	for (AActor* ChildActor: ChildActors) {
-		ChildActor->DetachFromActor(FDetachmentTransformRules(EDetachmentRule::KeepWorld, true));
-		ChildActor->GetRootComponent()->RemoveUserDataOfClass(UPrefabricatorAssetUserData::StaticClass());
+		if (IsValid(ChildActor))
+		{
+			ChildActor->DetachFromActor(FDetachmentTransformRules(EDetachmentRule::KeepWorld, true));
+			ChildActor->GetRootComponent()->RemoveUserDataOfClass(UPrefabricatorAssetUserData::StaticClass());
+
+			OnUnlinkChildFromPrefab.Broadcast(ChildActor);
+		}
 	}
 
 	// Finally delete the prefab actor
@@ -938,7 +1057,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 	
 #if WITH_EDITOR
 	ISourceControlModule& SourceControlModule = ISourceControlModule::Get();
-	if (SourceControlModule.IsEnabled() && SourceControlModule.GetProvider().IsAvailable())
+	if (SourceControlModule.IsEnabled() && SourceControlModule.GetProvider().IsAvailable() && PrefabActor->bIsSourceControlled)
 	{
 		TSharedPtr<ISourceControlState, ESPMode::ThreadSafe> State = SourceControlModule.GetProvider().GetState(PrefabActor->GetPackage(), EStateCacheUsage::ForceUpdate);
 		if (State.IsValid() && State->IsCheckedOutOther())
@@ -963,7 +1082,6 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 		if (ExistingActor && ExistingActor->GetRootComponent()) {
 			UPrefabricatorAssetUserData* PrefabUserData = ExistingActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
 			if (PrefabUserData && PrefabUserData->PrefabActor == PrefabActor) {
-				TArray<AActor*> ChildActors;
 				ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
 				LastUpdateByItemID.Add(PrefabUserData->ItemID, PrefabUserData->ActorLastUpdateID);
 			}
@@ -973,6 +1091,8 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 	if (Service.IsValid()) {
 		UWorld* World = PrefabActor->GetWorld();
 		TMap<FGuid, AActor*> PrefabItemToActorMap;
+
+		TMap<AActor*, FTransform> NewlySpawnedActors;
 
 		for (FPrefabricatorActorData& ActorItemData : PrefabAsset->ActorData) {
 			// Handle backward compatibility
@@ -986,6 +1106,23 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 
 			UClass* ActorClass = LoadObject<UClass>(nullptr, *ActorItemData.ClassPathRef.GetAssetPathString());
 			if (!ActorClass) continue;
+
+			AActor* ClassDefaultObject = ActorClass->GetDefaultObject<AActor>();
+
+			switch (InSettings.NetMode)
+			{
+				case EPrefabNetMode::LocalOnly:
+					if (ClassDefaultObject->GetIsReplicated())
+					{
+						continue;
+					}
+					break;
+				case EPrefabNetMode::ReplicatedOnly:
+					if (!ClassDefaultObject->GetIsReplicated()) continue;
+					break;
+				case EPrefabNetMode::All:
+					break;
+			}
 
 			// Try to re-use an existing actor from this prefab
 			AActor* ChildActor = nullptr;
@@ -1033,8 +1170,9 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				if (LoadState && InSettings.bCanLoadFromCachedTemplate) {
 					Template = LoadState->GetTemplate(ActorItemData.PrefabItemID, PrefabAsset->LastUpdateID);
 				}
-
+				
 				ChildActor = Service->SpawnActor(ActorClass, WorldTransform, PrefabActor->GetLevel(), Template);
+				NewlySpawnedActors.Add(ChildActor, WorldTransform);
 				
 				ParentActors(PrefabActor, ChildActor);
 
@@ -1103,7 +1241,18 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 
 #if WITH_EDITOR
 			ChildActor->MarkPackageDirty();
-#endif 
+#endif
+		}
+
+		TArray<AActor*> ChildActorPool;
+		PrefabActor->GetAttachedActors(ChildActorPool);
+		for (AActor* ChildActor : ChildActorPool) {
+			if (ChildActor && ChildActor->GetRootComponent()) {
+				UPrefabricatorAssetUserData* PrefabUserData = ChildActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
+				if (PrefabUserData && PrefabUserData->PrefabActor == PrefabActor) {
+					PrefabItemToActorMap.Add(PrefabUserData->ItemID, ChildActor);
+				}
+			}
 		}
 
 		// Fix up the cross references
@@ -1130,9 +1279,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 					FixupCrossReferences(ComponentData.Properties, Component, PrefabItemToActorMap);
 				}
 			}
-
 		}
-
 	}
 
 	// Destroy the unused actors from the pool
@@ -1166,22 +1313,77 @@ void FPrefabTools::FixupCrossReferences(const TArray<UPrefabricatorProperty*>& P
 {
 	for (UPrefabricatorProperty* PrefabProperty : PrefabProperties) {
 		if (!PrefabProperty || !PrefabProperty->bIsCrossReferencedActor) continue;
-
+		
 		FProperty* Property = ObjToWrite->GetClass()->FindPropertyByName(*PrefabProperty->PropertyName);
 
-		const FObjectProperty* ObjectProperty = CastField<FObjectProperty>(Property);
-		if (!ObjectProperty) continue;
+		if (const FObjectProperty* ObjectProperty = CastField<FObjectProperty>(Property))
+		{
+			AActor** SearchResult = PrefabItemToActorMap.Find(PrefabProperty->CrossReferencePrefabActorId);
+			if (!SearchResult) continue;
+			AActor* CrossReference = *SearchResult;
 
-		AActor** SearchResult = PrefabItemToActorMap.Find(PrefabProperty->CrossReferencePrefabActorId);
-		if (!SearchResult) continue;
-		AActor* CrossReference = *SearchResult;
+			ObjectProperty->SetObjectPropertyValue_InContainer(ObjToWrite, CrossReference);
+			
+			FString ActorName = CrossReference ? CrossReference->GetName() : "[NONE]";
+			UE_LOG(LogPrefabTools, Log, TEXT("Cross Reference: %s -> %s"), *PrefabProperty->CrossReferencePrefabActorId.ToString(), *ActorName);
+		}
+		else if (const FArrayProperty* ArrayProperty = CastField<FArrayProperty>(Property))
+		{
+			if (!ArrayProperty) continue;
 
-		ObjectProperty->SetObjectPropertyValue_InContainer(ObjToWrite, CrossReference);
+			FScriptArrayHelper ArrayHelper(ArrayProperty, ArrayProperty->ContainerPtrToValuePtr<void>(ObjToWrite));
+			ArrayHelper.EmptyValues();
 
-		////////
-		FString ActorName = CrossReference ? CrossReference->GetName() : "[NONE]";
-		UE_LOG(LogPrefabTools, Log, TEXT("Cross Reference: %s -> %s"), *PrefabProperty->CrossReferencePrefabActorId.ToString(), *ActorName);
-		////////
+			if (FSoftObjectProperty* SoftObjectProperty = CastField<FSoftObjectProperty>(ArrayProperty->Inner))
+			{
+				TArray<FSoftObjectPtr> NewItems;
+
+				for (const FGuid& CrossReferenceActorId : PrefabProperty->CrossReferencePrefabActorIds)
+				{
+					AActor** SearchResult = PrefabItemToActorMap.Find(CrossReferenceActorId);
+					if (!SearchResult) continue;
+					AActor* CrossReference = *SearchResult;
+					if (!IsValid(CrossReference)) continue;
+
+					NewItems.Add(FSoftObjectPtr(CrossReference));
+				
+					FString ActorName = CrossReference ? CrossReference->GetName() : "[NONE]";
+					UE_LOG(LogPrefabTools, Verbose, TEXT("Cross Reference: %s -> %s"), *PrefabProperty->CrossReferencePrefabActorId.ToString(), *ActorName);
+				}
+
+				for (int32 i = 0; i < NewItems.Num(); i++)
+				{
+					int32 NewIndex = ArrayHelper.AddValue();
+					void* Dest = ArrayHelper.GetRawPtr(NewIndex);
+					SoftObjectProperty->SetPropertyValue(Dest, NewItems[i]);
+				}
+			}
+
+			FWeakObjectProperty* WeakObjectProperty = CastField<FWeakObjectProperty>(ArrayProperty->Inner);
+			if (!WeakObjectProperty) continue;
+			
+			TArray<FWeakObjectPtr> NewItems;
+
+			for (const FGuid& CrossReferenceActorId : PrefabProperty->CrossReferencePrefabActorIds)
+			{
+				AActor** SearchResult = PrefabItemToActorMap.Find(CrossReferenceActorId);
+				if (!SearchResult) continue;
+				AActor* CrossReference = *SearchResult;
+				if (!IsValid(CrossReference)) continue;
+
+				NewItems.Add(FWeakObjectPtr(CrossReference));
+				
+				FString ActorName = CrossReference ? CrossReference->GetName() : "[NONE]";
+				UE_LOG(LogPrefabTools, Verbose, TEXT("Cross Reference: %s -> %s"), *PrefabProperty->CrossReferencePrefabActorId.ToString(), *ActorName);
+			}
+
+			for (int32 i = 0; i < NewItems.Num(); i++)
+			{
+				int32 NewIndex = ArrayHelper.AddValue();
+				void* Dest = ArrayHelper.GetRawPtr(NewIndex);
+				WeakObjectProperty->SetPropertyValue(Dest, NewItems[i]);
+			}
+		}
 	}
 }
 

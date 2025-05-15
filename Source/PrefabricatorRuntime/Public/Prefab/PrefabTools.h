@@ -10,12 +10,21 @@ struct FPrefabricatorActorData;
 class UPrefabricatorProperty;
 struct FRandomStream;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnUnlinkChildFromPrefab, AActor*)
+
+enum class EPrefabNetMode : uint8 {
+	LocalOnly,
+	ReplicatedOnly,
+	All
+};
+
 struct PREFABRICATORRUNTIME_API FPrefabLoadSettings {
 	bool bUnregisterComponentsBeforeLoading = false;
 	bool bRandomizeNestedSeed = false;
 	bool bSynchronousBuild = true;
 	bool bCanLoadFromCachedTemplate = false;
 	bool bCanSaveToCachedTemplate = false;
+	EPrefabNetMode NetMode = EPrefabNetMode::All;
 	const FRandomStream* Random = nullptr;
 };
 
@@ -57,8 +66,12 @@ private:
 class PREFABRICATORRUNTIME_API FPrefabTools {
 public:
 	static bool CanCreatePrefab();
-	static void CreatePrefab();
-	static APrefabActor* CreatePrefabFromActors(const TArray<AActor*>& Actors);
+	static bool HasPrefabSelected();
+	static APrefabActor* GetSelectedPrefab();
+	static void CreatePrefab(const FString& SavePath, const FString& InAssetName);
+	static void CreatePrefabAtDefaultPath();
+	static APrefabActor* CreatePrefabFromActors(TSubclassOf<UPrefabricatorAsset>, TSubclassOf<APrefabActor> ActorClass, const FString& SavePath, const FString&
+		InAssetName, const TArray<AActor*>& InActors);
 	static void AssignAssetUserData(AActor* InActor, const FGuid& InItemID, APrefabActor* Prefab);
 
 	static void SaveStateToPrefabAsset(APrefabActor* PrefabActor);
@@ -73,14 +86,18 @@ public:
 	static bool ShouldIgnorePropertySerialization(const FName& PropertyName);
 	static bool ShouldForcePropertySerialization(const FName& PropertyName);
 
+	static void AddSelectedActorsToPrefab(APrefabActor* PrefabActor);
+
 	static void ParentActors(AActor* ParentActor, AActor* ChildActor);
 	static void SelectPrefabActor(AActor* PrefabActor);
 	static void GetSelectedActors(TArray<AActor*>& OutActors);
 	static int GetNumSelectedActors();
-	static UPrefabricatorAsset* CreatePrefabAsset();
+	static UPrefabricatorAsset* CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName);
 	static int32 GetRandomSeed(const FRandomStream& Random);
 
 	static void IterateChildrenRecursive(APrefabActor* Actor, TFunction<void(AActor*)> Visit);
+
+	static FOnUnlinkChildFromPrefab OnUnlinkChildFromPrefab;
 
 private:
 	static void SaveActorState(AActor* InActor, APrefabActor* PrefabActor, const FPrefabActorLookup& CrossReferences, FPrefabricatorActorData& OutActorData);

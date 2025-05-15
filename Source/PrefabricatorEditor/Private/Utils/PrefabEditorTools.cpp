@@ -31,25 +31,15 @@
 #include "ThumbnailRendering/SceneThumbnailInfo.h"
 
 namespace {
-	template<typename T>
-	static T* CreateAssetOnContentBrowser(const FString& InAssetName, bool bSyncBrowserToAsset)
+	UPrefabricatorAssetInterface* CreateAssetOnContentBrowser(TSubclassOf<UPrefabricatorAssetInterface> AssetClass, const FString& SavePath, const FString& InAssetName, bool bSyncBrowserToAsset)
 	{
 		IContentBrowserSingleton& ContentBrowserSingleton = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get();
-		TArray<FString> SelectedFolders;
-		ContentBrowserSingleton.GetSelectedPathViewFolders(SelectedFolders);
-		const FString VirtualAssetFolder = SelectedFolders.Num() > 0 ? SelectedFolders[0] : "/All/Game";
-		
-		FString AssetFolder;
-		const EContentBrowserPathType PathType = IContentBrowserDataModule::Get().GetSubsystem()->TryConvertVirtualPath(VirtualAssetFolder, AssetFolder);
-		if (PathType != EContentBrowserPathType::Internal) {
-			AssetFolder = "/Game";
-		}
-		const FString AssetPath = AssetFolder + "/" + InAssetName;
+		const FString AssetPath = SavePath + "/" + InAssetName;
 
 		FString PackageName, AssetName;
 		IAssetTools& AssetTools = FModuleManager::Get().LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
 		AssetTools.CreateUniqueAssetName(*AssetPath, TEXT(""), PackageName, AssetName);
-		T* AssetObject = Cast<T>(AssetTools.CreateAsset(AssetName, AssetFolder, T::StaticClass(), nullptr));
+		UPrefabricatorAssetInterface* AssetObject = Cast<UPrefabricatorAssetInterface>(AssetTools.CreateAsset(AssetName, SavePath, AssetClass, nullptr));
 		if (AssetObject && bSyncBrowserToAsset) {
 			ContentBrowserSingleton.SyncBrowserToAssets(TArray<UObject*>({ AssetObject }));
 		}
@@ -274,14 +264,13 @@ UThumbnailInfo* FPrefabEditorTools::CreateDefaultThumbInfo(UPrefabricatorAsset* 
 	return SceneThumbnailInfo;
 }
 
-UPrefabricatorAsset* FPrefabEditorTools::CreatePrefabAsset()
+UPrefabricatorAsset* FPrefabEditorTools::CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName)
 {
-	UPrefabricatorAsset* PrefabAsset = CreateAssetOnContentBrowser<UPrefabricatorAsset>("PA_Prefab", true);
+	UPrefabricatorAsset* PrefabAsset = Cast<UPrefabricatorAsset>(CreateAssetOnContentBrowser(AssetClass, SavePath, InAssetName, true));
 
 	if (PrefabAsset) {
 		PrefabAsset->ThumbnailInfo = FPrefabEditorTools::CreateDefaultThumbInfo(PrefabAsset);
 	}
-
 	
 	TArray<UPackage*> PackagesToSave = TArray<UPackage*>();
 	PackagesToSave.Add(PrefabAsset->GetPackage());
@@ -292,7 +281,19 @@ UPrefabricatorAsset* FPrefabEditorTools::CreatePrefabAsset()
 
 UPrefabricatorAssetCollection* FPrefabEditorTools::CreatePrefabCollectionAsset()
 {
-	UPrefabricatorAssetCollection* Asset = CreateAssetOnContentBrowser<UPrefabricatorAssetCollection>("PAC_PrefabCollection", true);
+	// Pulled up from CreateAssetOnContentBrowser to avoid having to plumb save path all the way up collection creation
+	IContentBrowserSingleton& ContentBrowserSingleton = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get();
+	TArray<FString> SelectedFolders;
+	ContentBrowserSingleton.GetSelectedPathViewFolders(SelectedFolders);
+	const FString VirtualAssetFolder = SelectedFolders.Num() > 0 ? SelectedFolders[0] : "/All/Game";
+		
+	FString AssetFolder;
+	const EContentBrowserPathType PathType = IContentBrowserDataModule::Get().GetSubsystem()->TryConvertVirtualPath(VirtualAssetFolder, AssetFolder);
+	if (PathType != EContentBrowserPathType::Internal) {
+		AssetFolder = "/Game";
+	}
+	
+	UPrefabricatorAssetCollection* Asset = Cast<UPrefabricatorAssetCollection>(CreateAssetOnContentBrowser(UPrefabricatorAssetCollection::StaticClass(), AssetFolder, "PAC_PrefabCollection", true));
 	
 	TArray<UPackage*> PackagesToSave = TArray<UPackage*>();
 	PackagesToSave.Add(Asset->GetPackage());

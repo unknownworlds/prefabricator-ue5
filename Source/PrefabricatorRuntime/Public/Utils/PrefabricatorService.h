@@ -2,6 +2,7 @@
 
 #pragma once
 #include "CoreMinimal.h"
+#include "Asset/PrefabricatorAsset.h"
 #include "GameFramework/Info.h"
 
 class IPrefabricatorService;
@@ -32,7 +33,7 @@ public:
 	virtual void SelectPrefabActor(AActor* PrefabActor) = 0;
 	virtual void GetSelectedActors(TArray<AActor*>& OutActors) = 0;
 	virtual int GetNumSelectedActors() = 0;
-	virtual UPrefabricatorAsset* CreatePrefabAsset() = 0;
+	virtual UPrefabricatorAsset* CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName) = 0;
 	virtual FVector SnapToGrid(const FVector& InLocation) { return InLocation; }
 	virtual void SetDetailsViewObject(UObject* InObject) {}
 	virtual void RefreshDetailsViewObject(UObject* InObject) {}
@@ -49,6 +50,6 @@ public:
 	virtual void SelectPrefabActor(AActor* PrefabActor) override;
 	virtual void GetSelectedActors(TArray<AActor*>& OutActors) override;
 	virtual int GetNumSelectedActors() override;
-	virtual UPrefabricatorAsset* CreatePrefabAsset() override;
+	virtual UPrefabricatorAsset* CreatePrefabAsset(TSubclassOf<UPrefabricatorAsset> AssetClass, const FString& SavePath, const FString& InAssetName) override;
 };
 
